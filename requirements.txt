@@ -1,10 +1,11 @@
-numpy
-future
+cython>=0.21
+numpy>=1.8
 pytest>=3.1
 pybind11>=2.2.3
-requests
-scipy
+scipy>=0.15
 networkx
 pathos
 picos
 sparse
+qutip
+projectq

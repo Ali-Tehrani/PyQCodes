@@ -1,20 +1,43 @@
 language: python
 
-install: pip install tox codecov
-
-matrix:
+jobs:
   include:
-    - python: 3.6
-      env: TOXENV=py36
-    - python: 3.7
-      env: TOXENV=py37
-      dist: xenial
-      sudo: true
-    - python: 3.6
-      env: TOXENV=build
-    - python: 3.6
-      env: TOXENV=flake8
-    - python: 3.6
-      env: TOXENV=black
+    - name: "Python 3.7 on Xenial Linux"
+      python: 3.7
 
-script: tox
+    - name: "Python 3.7.4 on macOS"
+      os: osx
+      osx_image: xcode11.2  # Python 3.7.4 running on macOS 10.14.4
+      language: shell       # 'language: python' is an error on Travis CI macOS
+
+    - name: "Python 3.7.4 on Windows"
+      os: windows           # Windows 10.0.17134 N/A Build 17134
+      language: shell       # 'language: python' is an error on Travis CI Windows
+      before_install:
+        - choco install python --version 3.8.0
+        - python -m pip install --upgrade pip
+      env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
+
+install:
+  - pip3 install --upgrade pip
+  - pip install Cython --install-option="--no-cython-compile"
+  - pip3 install -e .
+
+#matrix:
+#  include:
+#    - python: 3.6
+#      env: TOXENV=py36
+#    - python: 3.7
+#      env: TOXENV=py37
+#      dist: xenial
+#      sudo: true
+#    - python: 3.6
+#      env: TOXENV=build
+#    - python: 3.6
+#      env: TOXENV=flake8
+#    - python: 3.6
+#      env: TOXENV=black
+#
+#script: tox
+
+script: pytest

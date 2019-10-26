@@ -16,7 +16,7 @@ setup(
                  'An open source software framework for doing optimized-based quantum '
                  'error-correction.'),
     long_description=long_description,
-    install_requires=requirements,
+    install_requires=['setuptools>=18.0', 'cython'] + requirements,
     zip_safe=False,
     license="LICENSE",
     packages=find_packages()
