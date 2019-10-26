@@ -1,5 +1,4 @@
 import numpy as np
-import qecc as q
 
 from PyQCodes.codes import *
 
