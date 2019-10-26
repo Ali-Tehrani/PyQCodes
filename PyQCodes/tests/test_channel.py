@@ -2,6 +2,7 @@ from PyQCodes.channel import AnalyticQChan
 from PyQCodes.param import OverParam
 
 import numpy as np
+import pytest
 from numpy.testing import assert_array_almost_equal
 from qutip import rand_dm_ginibre
 from scipy.linalg import block_diag
@@ -141,6 +142,7 @@ def test_maxima_first_coherent_information_dephrasure():
 
 
 # Very slow test.
+@pytest.mark.slow
 def test_optimizing_coherent_information_with_erasure_channel():
     r""" Test optimizing coherent information with an analytic example for erasure channel."""
     for err in np.arange(0.01, 1., 0.01):
@@ -158,6 +160,7 @@ def test_optimizing_coherent_information_with_erasure_channel():
 
 
 # Very slow test.
+@pytest.mark.slow
 def test_optimizing_coherent_information_with_amplitude_damping_channel():
     r""" Test optimizing coherent information with an analytic example for amplitude-damp."""
     def entropy(a):
@@ -186,6 +189,7 @@ def test_optimizing_coherent_information_with_amplitude_damping_channel():
         assert np.abs(actual["optimal_val"] - desired) < 1e-3
 
 
+@pytest.mark.slow
 def test_optimizing_coherent_information_pauli_channels():
     r"""Test optimizing coherent information with an analytic example for bit-flip channel."""
     for err in np.arange(0.01, 1., 0.01):
@@ -201,7 +205,6 @@ def test_optimizing_coherent_information_pauli_channels():
         assert np.abs(actual["optimal_val"] - desired) < 1e-3
 
 
-# Very slow test.
 def compare_lipschitz_slsqp_with_diffev():
     n = 3
     for p in np.arange(0.05, 0.5, 0.01):
@@ -277,7 +280,7 @@ def test_concatenation_of_two_channels():
 
     desired_result = []
 
-
+@pytest.mark.slow
 def test_minimum_fidelity_over_depolarizing_channel():
     r"""Test Minimum fidelity over depolarizing channel."""
     # Example obtained from nielsen and Chaung.
@@ -304,6 +307,7 @@ def test_minimum_fidelity_over_depolarizing_channel():
         assert np.all(np.abs(desired - actual["optimal_val"]) < 1e-5)
 
 
+@pytest.mark.slow
 def test_minimum_fidelity_over_bit_flip():
     r"""Test Minimum fidelity over bit-flip channel."""
     # Example obtained from "Quantum Computing Explained."
@@ -328,6 +332,7 @@ def test_minimum_fidelity_over_bit_flip():
         assert np.all(np.abs(desired - actual) < 1e-5)
 
 
+@pytest.mark.slow
 def test_minimum_fidelity_over_amplitude_damping():
     r"""Test Minimum fidelity over amplitude-damping channel."""
     # Example obtained from Nielsen and Chaung.
@@ -354,6 +359,7 @@ def test_minimum_fidelity_over_amplitude_damping():
 
 
 # Slow test
+@pytest.mark.slow
 def test_optimizing_coherent_information_erasure_using_choi_matrix():
     r"""Test optimizing coherent information with an analytic example for erasure channel."""
     for err in np.arange(0.01, 1., 0.01):
@@ -374,6 +380,7 @@ def test_optimizing_coherent_information_erasure_using_choi_matrix():
 
 
 # Very slow test
+@pytest.mark.slow
 def test_optimizing_coherent_information_dephrasure_using_choi_matrix():
     r"""Test maxima of coherent information of dephrasure based on choi matrix."""
     def optima_mixed_state_bound(p):

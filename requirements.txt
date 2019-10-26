@@ -7,6 +7,7 @@ scipy>=0.15
 networkx
 pathos
 picos
+numba>=0.45
 sparse
-qutip
+qutip>=4.4.1
 projectq
