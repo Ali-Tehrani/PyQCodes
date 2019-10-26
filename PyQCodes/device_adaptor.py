@@ -1,0 +1,38 @@
+from abc import ABC, abstractmethod
+
+
+class DeviceAdaptorABC(ABC):
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def unitary_two_design(self):
+        pass
+
+    @abstractmethod
+    def estimate_average_fidelity(self):
+        pass
+
+    @abstractmethod
+    def decomp_one_qubit_c_unitaries(self):
+        pass
+
+
+class ProjectQDeviceAdaptor(DeviceAdaptorABC):
+    def __init__(self):
+        super(DeviceAdaptorABC).__init__()
+
+    def unitary_two_design(self):
+        pass
+
+    def estimate_average_fidelity(self):
+        pass
+
+    def decomp_one_qubit_c_unitaries(self):
+        pass
+
+    def parameterize_circuits(self):
+        pass
+
+    def _compute_one_trial_average_fidelity(self):
+        pass
