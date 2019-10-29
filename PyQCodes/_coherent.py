@@ -1,9 +1,6 @@
-from PyQCodes.utils import decompose_matrix
 from PyQCodes.param import OverParam, CholeskyParam, ParameterizationABC
-from PyQCodes._optimize import initial_guesses_lipschitz
 
 import numpy as np
-from scipy.linalg import logm
 
 from scipy.optimize import minimize, differential_evolution
 from pathos.multiprocessing import ProcessingPool as Pool
@@ -73,6 +70,58 @@ def _use_multi_processes(samples, bounds, args, maxiter, eps, ftol, fobjective, 
             optimal_x_val = r["x"]
             success = r["success"]
     return maxima, success, optimal_x_val
+
+
+def initial_guesses_lipschitz(f, nsize, rank, param, chan, n, numb_samples=10, numb_tries=100):
+    r"""
+
+
+    Parameters
+    ----------
+    f : callable
+        Objective, Lipschitz Function that takes input from argument 'rho_sampler'.
+
+    param : callable
+        Function that returns uniformly random density states.
+
+    numb_samples : int
+        Number of samples returned.
+
+    numb_tries : int
+        Number of random samples to try.
+
+    Returns
+    -------
+
+
+    References
+    ----------
+    Based on the 2017 paper, "Global Optimization of Lipschitz Functions"
+    """
+    # Obtain single random vectors turn into density matrix and evaluate on objective function.
+    samples_vec = [param.random_vectors(nsize, rank)]
+    print(nsize, rank)
+    samples_rho = [param.rho_from_vec(samples_vec[0], nsize, rank)]
+    func_evals = [-f(samples_vec[0], nsize, rank, param, chan, n)]
+    counter = 0
+    success = False
+    f_max = func_evals[0]
+    while (counter < numb_tries) and len(samples_vec) < numb_samples:
+        vec = param.random_vectors(nsize, rank)
+        rho = param.rho_from_vec(vec, nsize, rank)
+
+        bounds = [func_evals[i] + np.sum(np.abs(rho - samples_rho[i]))
+                  for i in range(0, len(samples_vec))]
+        if f_max <= np.min(bounds):
+            samples_vec.append(vec)
+            samples_rho.append(rho)
+            func_evals.append(-f(vec, nsize, rank, param, chan, n))
+            f_max = np.max(func_evals)
+        counter += 1
+
+    if len(samples_vec) == numb_samples:
+        success = True
+    return samples_vec, func_evals, success
 
 
 def _optimize_samples_bfgs(samples, bounds, args, maxiter, eps, ftol, fobjective):
