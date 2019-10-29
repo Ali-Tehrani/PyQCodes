@@ -41,4 +41,4 @@ install:
 #script: tox
 
 script:
-  - pytest -v -m "not slow"
+  - pytest -m "not slow"
