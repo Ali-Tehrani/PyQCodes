@@ -1,4 +1,27 @@
-from PyQCodes._kraus import DenseKraus, SparseKraus
+r"""
+The MIT License.
+
+Copyright (c) 2019-Present PyQCodes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
+from PyQCodes.chan._kraus import DenseKraus, SparseKraus
 from qutip import rand_dm_ginibre
 from sparse import SparseArray
 
@@ -6,7 +29,7 @@ import numpy as np
 from scipy.linalg import block_diag
 from numpy.testing import assert_array_almost_equal, assert_raises
 
-r"""Tests for 'QCorr.SparseKraus'."""
+r"""Tests for 'PyQCodes._kraus.py'."""
 
 
 #########################
@@ -182,6 +205,7 @@ def test_channel_method_using_dephrasure_dense():
     krauss_ops = np.array(k_ops).copy()
     dkrauss = DenseKraus(k_ops, [1, 1], 2, 3)
 
+    assert_raises(AssertionError, dkrauss.channel, [np.eye(2)])
     for n in range(1, 4):
         if n != 1:
             krauss_ops = np.kron(np.array(k_ops), krauss_ops)
@@ -197,8 +221,9 @@ def test_channel_method_using_dephrasure_dense():
             desired += temp
 
         dkrauss.update_kraus_operators(n)
+        rho = np.array([rho])
         actual = dkrauss.channel(rho)
-        assert_array_almost_equal(actual, desired)
+        assert_array_almost_equal(actual[0], desired)
 
 
 def entropy_exchange_helper_assertion(krauss, single_krauss_ops):
@@ -516,3 +541,54 @@ def test_parallel_concatenation():
     dkraus2 = SparseKraus(k2, [1, 1], 2, 2)
     dkraus3 = dkraus1 * dkraus2
     assert_array_almost_equal(desired, dkraus3.kraus_ops.todense())
+
+
+def test_adjoint_of_complementary_channel_kraus_operators():
+    r"""Test the adjoint channel of the complementary channel based on kraus operators."""
+    # Test Adjoint complementary channel is unital
+    rho = np.eye(4)
+    krauss_ops = initialize_dephrasure_examples(0.1, 0.2)
+    chan = DenseKraus(krauss_ops, [1, 1], 2, 3, orthogonal_kraus=[2])
+    chan_s = SparseKraus(krauss_ops, [1, 1], 2, 3)
+
+    desired = np.eye(2)
+    # Test Dense Kraus
+    actual = chan.entropy_exchange(rho, 1, adjoint=True)
+    assert np.all(np.abs(actual - desired) < 1e-4)
+    # Test Sparse Kraus
+    actual = chan_s.entropy_exchange(rho, 1, adjoint=True).todense()
+    assert np.all(np.abs(actual - desired) < 1e-4)
+
+    # Test based on random density matrix.
+    rho = rand_dm_ginibre(4, 4).data.toarray()
+    desired = sum([rho[i, j] * krauss_ops[i].T.dot(krauss_ops[j])
+                   for i in range(0, 4) for j in range(0, 4)])
+    actual = chan.entropy_exchange(rho, 1, adjoint=True)
+    assert np.all(np.abs(actual - desired) < 1e-4)
+    actual = chan_s.entropy_exchange(rho, 1, adjoint=True).todense()
+    assert np.all(np.abs(actual - desired) < 1e-4)
+
+
+def test_basic_assumptions_kraus_operators():
+    r"""Test the basic assumptions for constructor for kraus operators."""
+    krauss_ops = initialize_dephrasure_examples(0.1, 0.2)
+    assert_raises(TypeError, SparseKraus, "asd", [1, 1], 2, 3)
+    assert_raises(TypeError, DenseKraus, "asd", [1, 1], 2, 3)
+    assert_raises(AssertionError, SparseKraus, krauss_ops, 2, 2, 3)
+    assert_raises(AssertionError, SparseKraus, krauss_ops, [1, 1], 4, 3)
+    assert_raises(AssertionError, SparseKraus, krauss_ops, [1, 1], 2, 4)
+    assert_raises(AssertionError, SparseKraus, krauss_ops, [1, 1], 2, "a")
+    assert_raises(AssertionError, SparseKraus, krauss_ops, [1, 1], "a", 4)
+
+    chan = DenseKraus(krauss_ops, [1, 1], 2, 3)
+    assert chan.numb_kraus == 4
+    assert len(chan) == 4
+    assert chan.numb_qubits[0] == 1
+    assert chan.numb_qubits[1] == 1
+    assert chan.dim_out == 3
+    assert chan.dim_in == 2
+
+
+if __name__ == "__main__":
+    test_channel_method_using_dephrasure_dense()
+    test_adjoint_of_complementary_channel_kraus_operators()

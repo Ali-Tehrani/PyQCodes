@@ -1,6 +1,28 @@
+r"""
+The MIT License.
+
+Copyright (c) 2019-Present PyQCodes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
 import numpy as np
 from scipy.linalg import sqrtm
-import picos as pic  # Semi-definite Programming
 
 from qutip import Qobj, ptrace
 
@@ -8,7 +30,7 @@ from qutip import Qobj, ptrace
 __all__ = ["ChoiQutip"]
 
 """
-Choi operator class based on QuTIP package. 
+Choi operator class based on QuTIP package.
 Used for modelling recovery and encoders for optimized-based codes.
 """
 
@@ -105,10 +127,11 @@ class ChoiQutip():
             of the choi matrix.
         """
         self.choi = choi_matrix
-        self.num_in = numb_qubits[0]
-        self.num_out = numb_qubits[1]
+        self._num_in = numb_qubits[0]
+        self._num_out = numb_qubits[1]
         # Dimension of input/output Hilbert space.
-        self.dim_out = dim_out
+        self._dim_in = dim_in
+        self._dim_out = dim_out
         self.input_dim = dim_in**numb_qubits[0]
         self.output_dim = dim_out**numb_qubits[1]
 
@@ -117,12 +140,36 @@ class ChoiQutip():
             raise ValueError("Choi matrix shape does not match dimension specified.")
 
         # dimemsion for the qutip object to understand.
-        dim = [[[dim_in] * self.num_in, [dim_out] * self.num_out], \
+        dim = [[[dim_in] * self.num_in, [dim_out] * self.num_out],
                [[dim_in] * self.num_in, [dim_out] * self.num_out]]
-        self.dim = dim
+        self._dim = dim
         self.qutip = Qobj(choi_matrix, dims=dim, type="super", superrep="choi")
         assert self.qutip.istp, "Choi matrix is not trace perserving."
         assert self.qutip.iscp, "Choi matrix is not completely positive."
+
+    @property
+    def dim_in(self):
+        return self._dim_in
+
+    @property
+    def dim_out(self):
+        return self._dim_out
+
+    @property
+    def dim(self):
+        return self._dim
+
+    @property
+    def num_in(self):
+        return self._num_in
+
+    @property
+    def num_out(self):
+        return self._num_out
+
+    @property
+    def numb_qubits(self):
+        return [self.num_in, self.num_out]
 
     def channel(self, rho):
         r"""
@@ -256,7 +303,7 @@ class ChoiQutip():
             error, and p_y, p_z denotes the probability of Y and phase-flip error Z, respectively.
 
         t_vec : array
-            [Tx, Ty, TZ] the non-unital parameters, each correponding to a translation of the
+            [Tx, Ty, TZ] the non-unital parameters, each corresponding to a translation of the
             maximally mixed state by the quantum channel.
 
         pauli_errors : bool
@@ -318,8 +365,8 @@ class ChoiQutip():
         else:
             # Non-unital channels
             cond1, cond2, cond3 = _conditions_non_unital(l_vec, tx, ty, tz)
-            satisfy_cp_tp_condi = -1e-10 <= cond2 - cond1 and -cond2 - cond1 <= 1e-10 and \
-                                  np.all(cond3 >= -1e-8)
+            satisfy_cp_tp_condi = -1e-10 <= cond2 - cond1 and -cond2 - cond1 <= 1e-10
+            satisfy_cp_tp_condi = satisfy_cp_tp_condi and np.all(cond3 >= -1e-8)
             if not satisfy_cp_tp_condi:
                 raise ValueError("Lambda and t values do not satisfy CP and TP conditions.")
 

@@ -1,19 +1,53 @@
+r"""
+The MIT License
+
+Copyright (c) 2019-Present PyQCodes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
 import numpy as np
 from abc import abstractstaticmethod
 
-#TODO : Insert Module Documentaion for Parameterization.
 r"""
-Contains static classes for Parameterization of Density States 
-intended for optimization.
+Contains static classes for parameterization of Density States intended for optimization.
 
-Introduces abstract static class ParameterizationABC, which serves as a template
-if anyone wants to add their own parameterization routine.
+All routines are allowed to control the rank of the density matrix. This is due to the fact that
+the density matrices are not a smooth manifold but it's decomposed into fixed rank are smooth 
+manifolds.
+
+Three Routines That Are of Interest. 
+
+ParameterizationABC : 
+    Abstract base class for parameterization of density matrices.
+    This is intended if one wants their own parameterization of density matrices.
+OverParam : 
+    Child class of ParameterizationABC. Models a state as the Cholesky decomposition L^\dagger L,
+    where L is any (rank times m) size matrix. Use this for small systems.
+CholeskyParam :
+    Child class of ParameterizationABC. Models a state as the Cholesky decomposition L^\dagger L,
+    where L is a lower triangular, (rank times m) size matrix . Use this for larger systems.
 """
 
 __all__ = ["StandardBasis", "OverParam", "CholeskyParam", "ParameterizationABC"]
 
 
-class ParameterizationABC():
+class ParameterizationABC:
     @abstractstaticmethod
     def numb_variables(nsize, rank):
         raise NotImplementedError
@@ -28,6 +62,11 @@ class ParameterizationABC():
 
     @abstractstaticmethod
     def vec_from_rho(rho, nsize):
+        pass
+
+    @abstractstaticmethod
+    def random_vectors(nsize, rank):
+        # Used for the lipschitz sampler.
         pass
 
 
@@ -198,6 +237,10 @@ class OverParam(ParameterizationABC):
         -------
         list :
             Gets random vector from the specified distribution.
+
+        Notes
+        -----
+        This is used in the Lipschitz Sampler procedure for finding initial guesses.
         """
         if dist == "normal":
             random_vecs = np.random.normal(0., 1.,
@@ -358,7 +401,7 @@ class CholeskyParam(ParameterizationABC):
     # Note that it is non-unique parameterization.
     """
     @staticmethod
-    def random_vectors(nsize, rank, dist="normal"):
+    def random_vectors(nsize, rank, dist="uniform", l_bnd=-1, u_bnd=1.):
         r"""
         Return a cholesky-parameterized vector based on a random density state.
 
@@ -370,20 +413,35 @@ class CholeskyParam(ParameterizationABC):
             Rank of the random density state.
         dist : str
             Produces random density state either from normal distribution "normal"
-             with mean zero and variance 1 or uniform distribution "uniform" from -1 to 1.
+             with mean zero and variance 1 or uniform distribution "uniform" from l_bnd to u_bnd.
+        l_bnd: float
+            The lower bound of each non-diagonal, real variable. Default is -1.
+        u_bnd : float
+            The upper bound of each real variable. Default is 1. Should always be greater than zero.
 
         Returns
         -------
         list
             Gets random vector from the specified distribution.
+
+        Notes
+        -----
+        The normal distribution is scaled so that it is between u_bnd. Highly Recommend Uniform
+        distribution. This is used in the Lipschitz Sampler procedure for finding initial guesses.
         """
+        assert u_bnd >= 0.
         numb_vars = CholeskyParam.numb_variables(nsize, rank)
         if dist == "normal":
-            random_vecs = np.random.normal(0., 1., size=(numb_vars))
+            rank_eigs = np.abs(np.random.normal(u_bnd / 2., u_bnd / 4., size=(rank)))
+            rank_eigs /= np.max(rank_eigs)
+            random_vecs = np.random.normal((u_bnd - l_bnd) / 2., (u_bnd - l_bnd) / 4.,
+                                           size=(numb_vars - rank))
         elif dist == "uniform":
-            random_vecs = np.random.uniform(-1, 1., size=(numb_vars))
+            rank_eigs = np.random.uniform(0., u_bnd, size=(rank))
+            random_vecs = np.random.uniform(l_bnd, u_bnd, size=(numb_vars - rank))
         else:
             raise TypeError("Wrong distribution parameter")
+        random_vecs = np.append(rank_eigs, random_vecs)
         return random_vecs
 
     @staticmethod
@@ -392,7 +450,7 @@ class CholeskyParam(ParameterizationABC):
         return rank * (rank + 1) + 2 * (nsize - rank) * rank - rank
 
     @staticmethod
-    def bounds(nsize, rank, l_bnd=-5., u_bnd=5.):
+    def bounds(nsize, rank, l_bnd=-1., u_bnd=1.):
         r"""
         Get the upper and lower bounds for each variable in the Cholesky Parameterization.
 
@@ -404,9 +462,9 @@ class CholeskyParam(ParameterizationABC):
         rank : int
             The Rank of the desired density state.
         l_bnd: float
-            The lower bound of each non-diagonal, real variable. Default is -10.
+            The lower bound of each non-diagonal, real variable. Default is -1.
         u_bnd : float
-            The upper bound of each real variable. Default is 10.
+            The upper bound of each real variable. Default is 1. Should always be greater than zero.
 
         Returns
         -------
@@ -425,24 +483,6 @@ class CholeskyParam(ParameterizationABC):
         # The rest of the elements are the off-diagonal components
         bounds = [(0., u_bnd)] * rank + [(l_bnd, u_bnd)] * (numb_real_vars - rank)
         return bounds
-
-    @staticmethod
-    def get_diagonal_indices(rank):
-        r"""
-        Get indices that correspond to the diagonal indices of the lower triangular matrix.
-
-        Parameters
-        ----------
-        rank : int
-            The rank of the density matrix.
-
-        Returns
-        -------
-        list of ints
-            Indices corresponding to diagonal indices of lower triangular matrix.
-        """
-        indices = [i + i * (i + 1) for i in range(0, rank)]
-        return indices
 
     @staticmethod
     def rho_from_vec(vec, nsize, rank=None):

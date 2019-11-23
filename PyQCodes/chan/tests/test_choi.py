@@ -1,11 +1,36 @@
+r"""
+The MIT License
+
+Copyright (c) 2019-Present PyQCodes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
 import numpy as np
 import cvxopt as cvx
 import picos as pic
+from numpy.testing import assert_raises
 from qutip import rand_dm_ginibre
 
-from PyQCodes._choi import ChoiQutip
-from PyQCodes._kraus import DenseKraus
+from PyQCodes.chan._choi import ChoiQutip
+from PyQCodes.chan._kraus import DenseKraus
 
+r"""Test file for PyQCodes._choi.py."""
 
 def set_up_dephrasure_conditions(p, q):
     # Set up the dephrasure channel for the tests bellow.
@@ -23,11 +48,11 @@ def set_up_dephrasure_conditions(p, q):
 
 def initialize_pauli_examples(p1, p2, p3):
     # Set up pauli channel with errors p1, p2, p3
-    I = np.array([[1., 0.], [0., 1.]], dtype=np.complex128)
+    identity = np.array([[1., 0.], [0., 1.]], dtype=np.complex128)
     Z = np.array([[1., 0.], [0., -1.]], dtype=np.complex128)
     X = np.array([[0., 1.], [1., 0.]], dtype=np.complex128)
     Y = np.array([[0., complex(0, -1.)], [complex(0, 1), 0.]], dtype=np.complex128)
-    krauss_ops = [I * np.sqrt((1 - p1 - p2 - p3)),
+    krauss_ops = [identity * np.sqrt((1 - p1 - p2 - p3)),
                   X * np.sqrt(p1),
                   Y * np.sqrt(p2),
                   Z * np.sqrt(p3)]
@@ -56,7 +81,7 @@ def test_creation_of_one_qubit_operators():
     px = 0.1
     lams = np.array([1. - 4. * px, 1. - 4. * px, 1. - 4. * px])
 
-    I = np.eye(2) * np.sqrt(1 - 3. * px)
+    identity = np.eye(2) * np.sqrt(1 - 3. * px)
     X = np.array([[0., 1.], [1., 0.]]) * np.sqrt(px)
     Y = np.array([[0., complex(0, -1.)], [complex(0, 1.), 0.]]) * np.sqrt(px)
     Z = np.array([[1., 0.], [0., -1.]]) * np.sqrt(px)
@@ -65,18 +90,21 @@ def test_creation_of_one_qubit_operators():
     channel = ChoiQutip.one_qubit_choi_matrix(lams, np.array([0., 0., 0.]), pauli_errors=False)
 
     # Check Equivalence to deplorizing channel over random set.
-    assert check_two_sets_of_krauss_are_same([I, X, Y, Z], channel.kraus_operators(), [1, 1], 2, 2)
+    assert check_two_sets_of_krauss_are_same([identity, X, Y, Z],
+                                             channel.kraus_operators(), [1, 1], 2, 2)
 
     # Check with Pauli-Errors
     pauli_errors = np.array([px, px, px])
-    channel = ChoiQutip.one_qubit_choi_matrix(pauli_errors, np.array([0., 0., 0.]), pauli_errors=True)
+    channel = ChoiQutip.one_qubit_choi_matrix(pauli_errors, np.array([0., 0., 0.]),
+                                              pauli_errors=True)
 
     # Check Trace-perserving
     cond = sum([np.conj(x.T).dot(x) for x in channel.kraus_operators()])
     assert np.all(np.abs(cond - np.eye(2)) < 1e-5)
 
     # Check Equivalence to deplorizing channel over random set.
-    assert check_two_sets_of_krauss_are_same([I, X, Y, Z], channel.kraus_operators(), [1, 1], 2, 2)
+    assert check_two_sets_of_krauss_are_same([identity, X, Y, Z],
+                                             channel.kraus_operators(), [1, 1], 2, 2)
 
 
 def test_creation_from_choi_operator():
@@ -93,6 +121,11 @@ def test_creation_from_choi_operator():
     # Check if the two constructed krauss operators are the same.
     assert check_two_sets_of_krauss_are_same(krauss_ops, choi_obj.kraus_operators(), numb_qubits,
                                              dim_in, dim_out)
+
+    # Test dimensions must match the choi matrix specified.
+    assert_raises(ValueError, ChoiQutip, choi_matrix, numb_qubits, 3, 3)
+    assert_raises(ValueError, ChoiQutip, choi_matrix, numb_qubits, 2, 2)
+    assert_raises(ValueError, ChoiQutip, choi_matrix, [1, 2], 2, 3)
 
 
 def test_action_of_choi_operator():
@@ -230,7 +263,7 @@ def test_picos_constraints_for_trace_perserving():
             mat = cvx.matrix(choi_matrix)
             dims = [(2 ** k, 2 ** k), (3 ** n, 3 ** n)]
             P = pic.Problem()
-            X = P.add_variable('X', (2**k * 3**n, 2 **k * 3**n))
+            X = P.add_variable('X', (2**k * 3**n, 2**k * 3**n))
             X.value = mat
 
             # Test partial trace is equivalent to identity.

@@ -1,47 +1,39 @@
-from PyQCodes._kraus import SparseKraus, DenseKraus
-from PyQCodes._choi import ChoiQutip
-from PyQCodes._coherent import optimize_procedure
+r"""
+The MIT License.
+
+Copyright (c) 2019-Present PyQCodes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
+from PyQCodes.chan._kraus import SparseKraus, DenseKraus
+from PyQCodes.chan._choi import ChoiQutip
+from PyQCodes.chan._coherent import optimize_procedure
 
 import numpy as np
-from scipy.linalg import sqrtm  # For Fidelity.
-from abc import ABC, abstractmethod
+from scipy.linalg import sqrtm
+from sparse import SparseArray
 
-# TODO: ADD Module Level-Documentation Here for AnalyticQCodes.
 r"""
-
-
-Contains AnalyticQChan which models quantum channels as krauss operators 
-or choi matrices, and QDeviceChannel which models quantum channels as 
-quantum circuits.
+Contains AnalyticQChan: Representing Quantum Channels Modeled as Kraus Operators or Choi Matrices.
 """
 
-__all__ = ["AnalyticQChan", "QDeviceChannel"]
-
-
-class QChanABC(ABC):
-    r"""Abstract Base Class for Quantum Channels."""
-    def __init__(self, dim):
-        pass
-
-    @abstractmethod
-    def coherent_info(self, rho):
-        pass
-
-    @abstractmethod
-    def effective_channel(self, n):
-        pass
-
-    @abstractmethod
-    def fidelity(self):
-        pass
-
-    @abstractmethod
-    def statistics(self):
-        pass
-
-    @abstractmethod
-    def channel(self):
-        pass
+__all__ = ["AnalyticQChan"]
 
 
 class AnalyticQChan():
@@ -57,9 +49,9 @@ class AnalyticQChan():
         choi matrix is provided as 'operator' instance.
     numb_krauss :  int
         The number of kraus operators. Only available if kraus operators were provided as
-        'operator' instance.
-    kraus_ops : list
-        Returns the kraus operators.
+        'operator' attribute.
+    kraus : list
+        Returns the kraus operators when n=1.
 
     Methods
     -------
@@ -68,17 +60,17 @@ class AnalyticQChan():
     average_entanglement_fidelity :
         The average entanglement fidelity with respect to a ensemble of states.
     channel :
-        Calculates the output of the channel with respect to a density matrix.
+        Calculates the quantum channel on a density matrix.
     entropy_exchange :
-        Calculates the entropy exchange matrix with respect to a density matrix.
+        Calculates the complementary channel/entropy exchange matrix on a density matrix.
     entropy :
-        Calculates the entropy with respect to a density matrix.
+        Calculates the entropy (log base 2) with respect to a density matrix.
     coherent_information :
         Calculates the coherent information with respect to a density matrix.
     optimize_coherent :
         Maximizes the coherent information of a given channel.
     optimize_fidelity :
-        Minimizes the fidelity between pure-states of a given channel.
+        Minimizes the fidelity over the space of pure-states of a given channel.
 
     Notes
     -----
@@ -99,26 +91,27 @@ class AnalyticQChan():
     --------
     # Example to compute coherent information of bit-flip map tensored two times.
 
-    numb_qubits = [1, 1]  # Accepts one qubits and outputs one qubits.
-    dim_in = 2  # Dimension of single qubit hilbert space is 2.
-    dim_out = 2  # Dimension of single qubit hilbert space after the bit-flip channel is 2.
+    >> numb_qubits = [1, 1]  # Accepts one qubits and outputs one qubits.
+    >> dim_in = 2  # Dimension of single qubit hilbert space is 2.
+    >> dim_out = 2  # Dimension of single qubit hilbert space after the bit-flip channel is 2.
 
-    p = 0.25  # Probability of error
-    identity = np.sqrt(p) * np.eye(2)
-    bit_flip = np.sqrt(1 - p) * np.array([[0., 1.], [1., 0.]])
-    kraus_ops = [identity, bit_flip]
-    channel = AnalyticQChan(kraus_ops, numb_qubits, dim_in, dim_out)
+    >> p = 0.25  # Probability of error
+    >> identity = np.sqrt(p) * np.eye(2)
+    >> bit_flip = np.sqrt(1 - p) * np.array([[0., 1.], [1., 0.]])
+    >> kraus_ops = [identity, bit_flip]
+    >> channel = AnalyticQChan(kraus_ops, numb_qubits, dim_in, dim_out)
 
-    # Optimize the coherent information using "differential evolution" and parameterization
-    # of density matrix with OverParameterization.
-    res = channel.optimize_coherent(n=2, rank=4, optimizer="diffev", param="overparam",
-                                    maxiter=200)
-    print(res)
+    Optimize the coherent information using "differential evolution" and parameterization
+    of density matrix with OverParameterization.
+    >> res = channel.optimize_coherent(n=2, rank=4, optimizer="diffev", param="overparam",
+    >>                                maxiter=200)
+    >> print(res)
+
     """
 
     def __init__(self, operator, numb_qubits, dim_in, dim_out, orthogonal_krauss=(), sparse=False):
         r"""
-        Constructor of AnalyticQChan class.
+        Construct the AnalyticQChan class.
 
         Parameters
         ----------
@@ -153,41 +146,42 @@ class AnalyticQChan():
 
         Examples
         --------
-        # Constructing a simple qubit channel
-        numb_qubits = [1, 1]  # Accepts one qubits and outputs one qubits.
-        dim_in = 2  # Dimension of single qubit hilbert space is 2.
-        dim_out = 2  # Dimension of single qubit hilbert space after the qubit channel is 2.
+        Constructing a simple qubit channel
+        >> numb_qubits = [1, 1]  # Accepts one qubits and outputs one qubits.
+        >> dim_in = 2  # Dimension of single qubit hilbert space is 2.
+        >> dim_out = 2  # Dimension of single qubit hilbert space after the qubit channel is 2.
 
-        p = 0.25  # Probability of error
-        identity = np.sqrt(p) * np.eye(2)
-        bit_flip = np.sqrt(1 - p) * np.array([[0., 1.], [1., 0.]])
-        kraus_ops = [identity, bit_flip]
-        channel = AnalyticQChan(kraus_ops, numb_qubits, dim_in, dim_out, sparse=True)
+        >> p = 0.25  # Probability of error
+        >> identity = np.sqrt(p) * np.eye(2)
+        >> bit_flip = np.sqrt(1 - p) * np.array([[0., 1.], [1., 0.]])
+        >> kraus_ops = [identity, bit_flip]
+        >> channel = AnalyticQChan(kraus_ops, numb_qubits, dim_in, dim_out, sparse=True)
 
+        Constructing the erasure channel where dimension of output hilbert space is larger.
+        >> numb_qubits = [1, 1]
+        >> dim_in = 2
+        >> dim_out = 3  # Erasure channel adds a extra dimension to output of the channel.
 
-        # Constructing the erasure channel where dimension of output hilbert space is larger.
-        numb_qubits = [1, 1]
-        dim_in = 2
-        dim_out = 3  # Erasure channel adds a extra dimension to output of the channel.
+        >> p = 0.25  # Probability of no error
+        >> identity = np.sqrt(p) * np.array([[1., 0.], [0., 1.], [0., 0.]])
+        >> e1 = np.sqrt(1 - p) * np.array([[0., 0.], [0., 0.], [1., 0.]])
+        >> e2 = np.sqrt(1 - p) * np.array([[0., 0.], [0., 0.], [0., 1.]])
 
-        p = 0.25  # Probability of no error
-        identity = np.sqrt(p) * np.array([[1., 0.], [0., 1.], [0., 0.]])
-        e1 = np.sqrt(1 - p) * np.array([[0., 0.], [0., 0.], [1., 0.]])
-        e2 = np.sqrt(1 - p) * np.array([[0., 0.], [0., 0.], [0., 1.]])
+        >> kraus_ops = [identity, e1, e2]
+        The indices {0} of kraus ops is orthogonal to kraus ops indices to {1, 2}
+        >> orthogonal = [1]
+        >> channel = AnalyticQChan(kraus_ops, numb_qubits, dim_in, dim_out,
+        >>                         orthogonal_krauss=orthogonal)
 
-        kraus_ops = [identity, e1, e2]
-        # The indices {0} of kraus ops is orthogonal to kraus ops indices to {1, 2}
-        orthogonal = [1]
-        channel = AnalyticQChan(kraus_ops, numb_qubits, dim_in, dim_out,
-                                orthogonal_krauss=orthogonal)
         """
-        if not (isinstance(operator, list) or isinstance(operator, np.ndarray)):
+        if not (isinstance(operator, (list, np.ndarray, SparseArray))):
             # Test if it is kraus operator or choi type.
-            raise TypeError("Operator argument should be a list (kraus) or ndarray (choi).")
+            raise TypeError("Operator argument should be a list, ndarray or SparseArray.")
 
         # If Operator is Kraus Type
         self.sparse = sparse
-        if isinstance(operator, list):
+        if (isinstance(operator, (np.ndarray, SparseArray)) and operator.ndim == 3) or \
+                isinstance(operator, list):
             self._type = "kraus"
             if sparse:
                 self.krauss = SparseKraus(operator, numb_qubits, dim_in, dim_out)
@@ -203,62 +197,198 @@ class AnalyticQChan():
                                        % operator.ndim
             self._type = "choi"
             self.choi = ChoiQutip(operator, numb_qubits, dim_in, dim_out)
-        # TODO: Add or remove abstract class? Should be thought of after.
-        # super(QChanABC, self).__init__(numb_qubits)
 
     @property
     def nth_kraus_operators(self):
+        r"""
+        Get the Kraus operators for the nth-channel based on "current_n" attribute.
+
+        Returns
+        -------
+        np.ndarray :
+            Returns three-dimensional (k, i, j) numpy array, where each kth array is a kraus
+            operator representing the channel tensored n times.
+
+        Raises
+        ------
+        AssertionError :
+            The channel must be kraus operator style, not choi matrix.
+
+        """
         # Get kraus operators for the nth-channel use.
         assert self._type == "kraus", "Function only works with kraus operators."
         return self.krauss.nth_kraus_ops
 
     @property
     def input_dimension(self):
-        # Get dimension of the single particle hilbert space tensored "numb_qubits" times.
-        # Should be number of rows/columns of density state, that is about to go through channel.
-        if self._type == "kraus": return self.krauss.input_dim**self._current_n
-        else: return self.choi.input_dim
+        r"""
+        Return the dimension of a single particle of the input to the power of number of particles.
+
+        Should be number of rows/columns of density matrix, that is about to go through channel.
+        """
+        if self._type == "kraus":
+            return self.krauss.input_dim**self._current_n
+        else:
+            return self.choi.input_dim
 
     @property
     def output_dimension(self):
-        # Get dimension of density states of output of the channel based on current n.
-        # Should be hte number of rows/columns of density state after going through the channel.
-        if self._type == "kraus": return self.krauss.output_dim**self._current_n
-        else: return self.choi.output_dim
+        r"""
+        Return the dimension of a single particle of the ouput to the power of number of particles.
+
+        Should be number of rows/columns of density matrix, after going through channel.
+        """
+        if self._type == "kraus":
+            return self.krauss.output_dim**self._current_n
+        else:
+            return self.choi.output_dim
 
     @property
     def _current_n(self):
-        return self.krauss.current_n
+        if self._type == 'kraus':
+            return self.krauss.current_n
+        else:
+            # Choi matrices can only have n=1.
+            return 1
 
     @property
     def numb_krauss(self):
+        r"""Return the number of kraus operators for the single (n=1) channel."""
         assert self._type == "kraus", "Function only works with kraus operators."
         return self.krauss.numb_krauss
 
     @property
-    def kraus_ops(self):
-        # Kraus operators for n=1 channel.
+    def kraus(self):
+        r"""Return the kraus operators for the single (n=1) initial channel."""
         if self._type == "kraus":
-            return self.krauss.kraus_ops
+            if self.sparse:
+                return self.krauss.kraus_ops.todense()
+            else:
+                return self.krauss.kraus_ops
         else:
             return self.choi.kraus_operators()
 
+    @property
+    def dim_in(self):
+        r"""Return the dimension of a single particle that is the input of the channel."""
+        if self._type == "kraus":
+            return self.krauss.dim_in
+        else:
+            return self.choi.dim_in
+
+    @property
+    def dim_out(self):
+        r"""Return the dimension of a single particle that is the output of the channel."""
+        if self._type == "kraus":
+            return self.krauss.dim_out
+        else:
+            return self.choi.dim_out
+
+    @property
+    def numb_qubits(self):
+        r"""Return the number of particles."""
+        if self._type == "kraus":
+            return self.krauss.numb_qubits
+        else:
+            return self.choi.numb_qubits
+
     def __add__(self, other):
-        return AnalyticQChan(self.number_qubits, self.krauss + other.krauss)
+        r"""
+        Return channel A + B, where B is applied first then A is applied next.
+
+        Parameters
+        ----------
+        other : AnalyticQChan
+            Quantum channel object.
+
+        Returns
+        -------
+        AnalyticQChan :
+            Returns the channel A + B, where B is applied first then A is applied next.
+
+        Raises
+        ------
+        TypeError :
+            Returns error if the dimension of A does not match the dimension B.
+
+        """
+        assert self._type == "kraus", "Only works for kraus operators."
+        issparse = self.sparse or other.sparse
+        if issparse:
+            new_kraus_ops = SparseKraus.serial_concatenate(self.kraus, other.kraus)
+        else:
+            new_kraus_ops = DenseKraus.serial_concatenate(self.kraus, other.kraus)
+        numb_qubits = [other.numb_qubits[0], self.numb_qubits[1]]
+        dim_in = other.dim_in
+        dim_out = self.dim_out
+        return AnalyticQChan(new_kraus_ops, numb_qubits, dim_in, dim_out, sparse=issparse)
 
     def __mul__(self, other):
-        return AnalyticQChan(self.number_qubits + other.number_qubits,
-                             self.krauss * other.krauss)
+        r"""
+        Parallel Concatenate two channels A \otimes B.
+
+        Parameters
+        ----------
+        other : AnalyticQChan
+            The channel object B.
+
+        Returns
+        -------
+        AnalyticQChan :
+            Returns a new channel that models A tensored with B.
+
+        Notes
+        -----
+        - The number of particles set to one particle and one particle for output.
+
+        """
+        assert self._type == "kraus", "Only works for kraus operators."
+        issparse = self.sparse or other.sparse
+        if issparse:
+            new_kraus_ops = SparseKraus.parallel_concatenate(self.kraus, other.kraus)
+        else:
+            new_kraus_ops = DenseKraus.parallel_concatenate(self.kraus, other.kraus)
+        numb_qubits = [1, 1]
+        dim_in = self.dim_in * other.dim_in
+        dim_out = self.dim_out * other.dim_out
+        return AnalyticQChan(new_kraus_ops, numb_qubits, dim_in, dim_out, sparse=issparse)
 
     def _is_qubit_channel(self):
-        r"""True if it is qubit channel."""
+        r"""Return true if it is qubit channel."""
         if self.input_dimension == 2 and self.output_dimension == 2:
             return True
         return False
 
-    def fidelity_two_states(self, rho):
-        # TODO: Add assertion that it must match dimensions.
-        chan = self.channel(rho, n=1)
+    def _update_channel_tensored(self, n):
+        r"""Update the channel so that it becomes the channel tensored n-times."""
+        if self._type == "choi":
+            assert n == 1, "For Choi-matrices only n=1 can be evaluated. Turn to Kraus Operators."
+        # Update the "current_n" to correspond to user-provided n.
+        else:
+            if n != self._current_n:
+                self.krauss.update_kraus_operators(n)
+
+    def fidelity_two_states(self, rho, n):
+        r"""
+        Calculate the fidelity between rho and the channel evaluated on rho.
+
+        The fidelity is defined as :
+        .. math:: F(\rho, \mathcal{N}(\rho)) = Tr(\sqrt{\sqrt{\rho}\mathcal{N}(\rho)\sqrt{\rho}}).
+
+        Parameters
+        ----------
+        rho : np.ndarray
+            The density matrix.
+        n : int
+            The number of times the channel is tensored.
+
+        Returns
+        -------
+        float :
+            The fidelity between rho and the channel evaluated on rho.
+
+        """
+        chan = self.channel(rho, n)
         sqrt_rho = sqrtm(rho)
         fidel = np.trace(sqrtm(sqrt_rho.dot(chan).dot(sqrt_rho)))
         assert np.abs(np.imag(fidel)) < 1e-5
@@ -266,7 +396,7 @@ class AnalyticQChan():
 
     def average_entanglement_fidelity(self, probs, states):
         r"""
-        Calculates average entanglement fidelity of an given ensemble.
+        Calculate average entanglement fidelity of an given ensemble.
 
         Equivalent to ensemble average fidelity.
 
@@ -286,6 +416,7 @@ class AnalyticQChan():
         References
         ----------
         Based on "arXiv:quant-ph/0004088".
+
         """
         if self._type == "kraus":
             return self.krauss.average_entanglement_fidelity(probs, states)
@@ -316,6 +447,7 @@ class AnalyticQChan():
         -----
         It is highly recommended to use kraus operators rather than choi-matrices for
         computational speed-ups.
+
         """
         # For Kraus Operators
         if self._type == "kraus":
@@ -330,7 +462,7 @@ class AnalyticQChan():
 
     def entropy_exchange(self, rho, n, adjoint=False):
         r"""
-        Computes the entropy exchange matrix given kraus operators.
+        Compute the entropy exchange matrix (complementary channel) given kraus operators.
 
         The entropy exchange matrix W for a set of kraus operators :math:'\{A_i\}' is defined
         to have matrix entries :math:'W_{ij}' on the ith, jth position to be
@@ -357,6 +489,7 @@ class AnalyticQChan():
         ------
         AssertionError :
             This does not work for choi-matrices.
+
         """
         assert self._type == "kraus", "Kraus operators should be provided. Not Choi Matrices."
         # Check if krauss operator matches the krauss operators for channel tensored n times.
@@ -381,6 +514,7 @@ class AnalyticQChan():
         -------
         float :
             The von neumann entropy.
+
         """
         if self.sparse:
             eigs = np.linalg.eigvalsh(mat)
@@ -418,6 +552,7 @@ class AnalyticQChan():
         the last term is computated as, .. math::
             I_c(\rho, N) = S(N(\rho) - S((I \otimes N) \Phi)
         where .math.'\Phi' is the purification of .math.'\rho'.
+
         """
         quantum_chann = self.channel(rho, n)
         if self._type == "kraus":
@@ -432,9 +567,9 @@ class AnalyticQChan():
         return coherent_info
 
     def optimize_coherent(self, n, rank, optimizer="diffev", param="overparam", lipschitz=0,
-                          use_pool=False, maxiter=50, samples=()):
+                          use_pool=False, maxiter=50, samples=(), disp=False, regularized=False):
         r"""
-        maximum of coherent information of a channel of all density matrix of fixed rank.
+        Maximum of coherent information of a channel of all density matrix of fixed rank.
 
         This is defined on a channel N with complementary channel N^c as
         .. math::
@@ -466,11 +601,28 @@ class AnalyticQChan():
         samples : list
             List of vectors that satisfy the parameterization from "param", that are served as
             initial guesses.
+        disp : bool
+            Print and display during the optimization procedure. Default is false.
+        regularized : bool
+            Return the coherent information of rho divided by n.
 
         Returns
         -------
-        float :
-            Return the coherent information of a channel.
+        dict :
+        The result is a dictionary with fields:
+
+            optimal_rho : np.ndarray
+                The density matrix of the optimal solution.
+            optimal_val : float
+                The optimal value of either coherent information or fidelity.
+            method : str
+                Either diffev or slsqp.
+            success : bool
+                True if optimizer converges.
+            objective : str
+                Either coherent or fidelity
+            lipschitz : bool
+                True if uses lipschitz properties to find initial guesses.
 
         Notes
         -----
@@ -491,16 +643,15 @@ class AnalyticQChan():
         - A good strategy is to use lipschitz sampler with SLSQP. It has comparable accuracy to
         differential_evolution with LatinHypercube sampler. Increase use_pool, increases
         computation-speed-up at the cost of using cpu-cores.
+
         """
-        if self._type == "choi":
-            assert n == 1, "For Choi-matrices only n=1 can be evaluated. Turn to Kraus Operators."
-        else:
-            # Update the "current_n" to correspond to user-provided n.
-            if n != self._current_n:
-                self.krauss.update_kraus_operators(n)
-        return optimize_procedure(self, n=n, rank=rank, optimizer=optimizer, param=param,
-                                  objective="coherent", lipschitz=lipschitz, use_pool=use_pool,
-                                  maxiter=maxiter, samples=samples)
+        self._update_channel_tensored(n)
+        result = optimize_procedure(self, n=n, rank=rank, optimizer=optimizer, param=param,
+                                    objective="coherent", lipschitz=lipschitz, use_pool=use_pool,
+                                    maxiter=maxiter, samples=samples)
+        if regularized:
+            result["optimal_val"] /= float(n)
+        return result
 
     def optimize_fidelity(self, n, optimizer="diffev", param="overparam", lipschitz=0,
                           use_pool=False, maxiter=50, samples=()):
@@ -536,118 +687,29 @@ class AnalyticQChan():
 
         Returns
         -------
-        float :
-            Return the mininum fidelity of a channel.
+        dict :
+        The result is a dictionary with fields:
+
+            optimal_rho : np.ndarray
+                The density matrix of the optimal solution.
+            optimal_val : float
+                The optimal value of either coherent information or fidelity.
+            method : str
+                Either diffev or slsqp.
+            success : bool
+                True if optimizer converges.
+            objective : str
+                Either coherent or fidelity
+            lipschitz : bool
+                True if uses lipschitz properties to find initial guesses.
 
         Notes
         -----
         - Optimization of minimum fidelity is over pure states and hence rank one density matrices.
-        """
-        if self._type == "choi":
-            assert n == 1, "For Choi-matrices only n=1 can be evaluated. Turn to Kraus Operators."
-        # Update the "current_n" to correspond to user-provided n.
-        else:
-            if n != self._current_n:
-                self.krauss.update_kraus_operators(n)
-        return optimize_procedure(self, n=n, rank=1, optimizer=optimizer, param=param,
-                                  objective="fidelity", lipschitz=lipschitz, use_pool=use_pool,
-                                  maxiter=maxiter, samples=samples)
-
-    @staticmethod
-    def concatenate_two_channels(channel1, channel2):
-        r"""
-        Serial Concantenation of two channels, A, B, to produce a third channel A \circ B.
-
-        Parameters
-        ----------
-        channel1 : AnalyticQChan
-            Channel being concatenated on left-side.
-
-        channel2 : AnalyticQChan
-            Channel being concantenated on right-side.
-
-        Returns
-        -------
-        AnalyticQChan :
-            Channel A \circ B.
-        """
-        pass
-
-    @staticmethod
-    def one_qubit_channel(l_vec, t_vec, pauli_errors=False):
-        r"""
-        Choi matrix based on the one qubit parameterization.
-
-        Parameters
-        ----------
-        l_vec : np.ndarray(M,)
-            [lx, ly, lz], the lambdas parameters. If pauli_errors is true, then l_vec denotes the
-            set of pauli errors p_x, p_y, p_z, where p_x denotes the probability of bit-flip X
-            error, and p_y, p_z denotes the probability of Y and phase-flip error Z, respectively.
-
-        t_vec : np.ndarray(M,)
-            [Tx, Ty, TZ] the non-unital parameters, each correponding to a translation of the
-            maximally mixed state by the quantum channel.
-
-        pauli_errors : bool
-            True if l_vec is the set of pauli errors ie l_vec = [px, py, pz], where px is the
-            probability of pauli-X error, etc.
-
-        Returns
-        -------
-        AnalyticQChan :
-            Returns AnalyticQChan based on the choi matrix of the one-qubit channel.
-
-        Raises
-        ------
-        AssertionError :
-            If the pauli errors [px, py, pz] are not all less than or equal to one.
-
-        ValueError :
-            If the six parameters [lx, ly, lz, tx, ty, tz] do not satisfy the conditions of being
-            completely positive and trace-perserving qubit channel.
-
-        Notes
-        -----
-        Based on the paper "doi:10.1088/1751-8113/47/13/135302".
-        """
-        choi_obj = ChoiQutip.one_qubit_choi_matrix(l_vec, t_vec, pauli_errors)
-        return AnalyticQChan(choi_obj.choi, [1, 1], 2, 2)
-
-
-from projectq import MainEngine  # import the main compiler engine
-from projectq.ops import H, Measure  # import the operations we want to perform (Hadamard and measurement)
-
-
-class QDeviceChannel():
-    r""""""
-    def __init__(self, numb_qubits, circuit, engine=MainEngine, real_device=False):
-        r"""
-
-        Parameters
-        ----------
-        numb_qubits : int
-            Number of qubits
-
-        circuit : callable
-            Should take as input the engine from 'ProjectQ.cengines'.
-
-        engine :
-            Should be one of the following types from 'ProjectQ.cengines'. Should
-            be of type "BasicEngine" from ProjectQ. See their documentation
-            for more details,
-            "https://projectq.readthedocs.io/en/latest/projectq.cengines.html".
-
-        real_device : bool
-            Boolean indicating whether it's being runned on a real quantum device.
-
-        Returns
-        -------
 
         """
-        self.engine = engine
-        self.circuit = circuit
-        super(QChanABC).__init__(numb_qubits)
-
-    def channel():
-        pass
+        self._update_channel_tensored(n)
+        result = optimize_procedure(self, n=n, rank=1, optimizer=optimizer, param=param,
+                                    objective="fidelity", lipschitz=lipschitz, use_pool=use_pool,
+                                    maxiter=maxiter, samples=samples)
+        return result

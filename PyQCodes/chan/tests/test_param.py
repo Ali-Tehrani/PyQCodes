@@ -1,9 +1,9 @@
-from PyQCodes.param import StandardBasis, OverParam, CholeskyParam
+from PyQCodes.chan.param import StandardBasis, OverParam, CholeskyParam, ParameterizationABC
 from qutip import rand_dm_ginibre
 import numpy as np
 
-from numpy.testing import assert_array_almost_equal
-r"""Tests for "QCorr.param.py"."""
+from numpy.testing import assert_array_almost_equal, assert_raises
+r"""Tests for "PyQCodes.param.py"."""
 
 
 def test_standard_basis():
@@ -122,7 +122,7 @@ def test_overparameterization():
     eigs, evecs = np.linalg.eigh(rho)
     eigs[np.abs(eigs) < 1e-5] = 0.
     # Eigenvalues are ordered in a increasing manner, hence first two eigenvalues are zero.
-    matrix_A = evecs[:,2:].dot(np.diag(np.sqrt(eigs[2:])))
+    matrix_A = evecs[:, 2:].dot(np.diag(np.sqrt(eigs[2:])))
     desired_vec = [np.real(matrix_A[0, 0]), np.imag(matrix_A[0, 0]), np.real(matrix_A[0, 1]),
                    np.imag(matrix_A[0, 1]), np.real(matrix_A[1, 0]), np.imag(matrix_A[1, 0]),
                    np.real(matrix_A[1, 1]), np.imag(matrix_A[1, 1]), np.real(matrix_A[2, 0]),
@@ -146,11 +146,10 @@ def test_cholesky_parameterization_rho_from_vector():
         actual_rho = CholeskyParam.rho_from_vec(v, 2 ** n)
         a = np.array([[complex(v[0], 0.), 0.], [complex(v[2], v[3]), complex(v[1], 0.)]])
         desired_rho = a.dot(np.conj(a).T) / np.trace(a.dot(np.conj(a).T))
-        assert np.linalg.matrix_rank(desired_rho) == rank
+        assert np.abs(np.linalg.matrix_rank(desired_rho) - rank) < 1e-4
         assert_array_almost_equal(actual_rho, desired_rho)
         assert np.abs(np.trace(actual_rho) - 1.) < 1e-10
         assert np.min(np.linalg.eigvalsh(actual_rho)) >= -1e-10
-
 
         rank = 1
         v = np.random.uniform(-5., 5., rank * (rank + 1) + 2 * (2**n - rank) * rank - rank)
@@ -193,7 +192,7 @@ def test_cholesky_parameterization_rho_from_vector():
         assert np.min(np.linalg.eigvalsh(actual_rho)) >= -1e-10
 
     # Test conversion from rho to vector to rho.
-    rho = np.array([[0.25, 0.2  + 0.3j], [0.2 - 0.3j, 0.75]])
+    rho = np.array([[0.25, 0.2 + 0.3j], [0.2 - 0.3j, 0.75]])
     vec = CholeskyParam.vec_from_rho(rho, 2, 2)
     actual_rho = CholeskyParam.rho_from_vec(vec, 2, 2)
     assert_array_almost_equal(rho, actual_rho)
@@ -202,8 +201,79 @@ def test_cholesky_parameterization_rho_from_vector():
 def test_choleskly_parameterization_vector_from_rho():
     r"""Test converting cholesky parameterization to vector from rho."""
     rho = np.array([[.25, .2 + .3j], [.2 - .3j, .75]])
-    actual = CholeskyParam.vec_from_rho(rho, 2, 2)
     desired = np.array([0.5, 0.479583, 0.4, -0.6])  # Test with wolframalpha.
+
+    actual = CholeskyParam.vec_from_rho(rho, 2, 2)
     assert_array_almost_equal(actual, desired)
+
+    actual = CholeskyParam.vec_from_rho(rho, 2, None)
+    assert_array_almost_equal(actual, desired)
+
     # Test Number of variables
     assert CholeskyParam.numb_variables(2, 2) == len(desired)
+
+
+def test_assertion_error_parameterization_abc():
+    r"""Test that the ParameterizationABC raises not implemented error."""
+    assert_raises(NotImplementedError, ParameterizationABC.numb_variables, 5, 10)
+    assert_raises(NotImplementedError, ParameterizationABC.bounds, 5)
+    assert_raises(NotImplementedError, ParameterizationABC.rho_from_vec, 5, 10)
+    try:
+        ParameterizationABC.vec_from_rho(5, 10)
+        ParameterizationABC.random_vectors(5, 10)
+    except NotImplementedError:
+        raise AssertionError("No error should be attempted.")
+
+
+def test_bounds_on_different_parameterizations():
+    r"""Test the bounds on the variables in the different parameterizations."""
+    for matrix_size in range(1, 5):
+        for rank in range(1, matrix_size):
+            # Overparam
+            bounds = OverParam.bounds(matrix_size, rank)
+            for x, y in bounds:
+                assert np.abs(x + 1) < 1e-4
+                assert np.abs(y - 1) < 1e-4
+
+            # Cholesky Parameterization
+            l_bnd = np.random.random_integers(1, 5)
+            u_bnd = np.random.random_integers(l_bnd, 10)
+            bounds = CholeskyParam.bounds(matrix_size, rank, l_bnd, u_bnd)
+            # Test the first rank are inbetween zero and u_bnd
+            for i in range(0, rank):
+                assert np.abs(bounds[i][0]) < 1e-4
+                assert np.abs(bounds[i][1] - u_bnd) < 1e-4
+            for i in range(rank, len(bounds)):
+                assert np.abs(l_bnd - bounds[i][0]) < 1e-4
+                assert np.abs(bounds[i][1] - u_bnd) < 1e-4
+
+        # Standard
+        bounds = StandardBasis.bounds(matrix_size)
+        for x, y in bounds:
+            assert np.abs(x + 1) < 1e-4
+            assert np.abs(y - 1) < 1e-4
+
+
+def test_random_vectors_generation_parameterizations():
+    r"""Test the random vectors generated from the parameterizations."""
+    # Non acceptable distribution
+    assert_raises(TypeError, OverParam.random_vectors, 5, 4, 'w.e.')
+    assert_raises(TypeError, CholeskyParam.random_vectors, 5, 3, "w.sas")
+
+    np.random.seed(1)
+    for _ in range(0, 10):
+        random_vec = OverParam.random_vectors(5, 4, "normal")
+        numb_vars = OverParam.numb_variables(5, 4)
+        desired = np.random.normal(0., 1., size=(numb_vars))
+        assert np.all(np.abs(random_vec - desired))
+
+        random_vec = OverParam.random_vectors(5, 4, "uniform")
+        numb_vars = OverParam.numb_variables(5, 4)
+        desired = np.random.uniform(-1, 1., size=(numb_vars))
+        assert np.all(np.abs(random_vec - desired))
+
+        random_vec = CholeskyParam.random_vectors(5, 4, "normal")
+        assert np.all(random_vec[:4] <= 1.)
+
+        random_vec = CholeskyParam.random_vectors(5, 4, "uniform")
+        assert np.all(random_vec[:4] <= 1.)

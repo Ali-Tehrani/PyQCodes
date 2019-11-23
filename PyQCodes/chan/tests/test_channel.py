@@ -1,9 +1,32 @@
-from PyQCodes.channel import AnalyticQChan
-from PyQCodes.param import OverParam
+r"""
+The MIT License.
+
+Copyright (c) 2019-Present PyQCodes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
+from PyQCodes.chan.channel import AnalyticQChan
+from PyQCodes.chan.param import OverParam
 
 import numpy as np
 import pytest
-from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_array_almost_equal, assert_raises
 from qutip import rand_dm_ginibre
 from scipy.linalg import block_diag
 
@@ -48,6 +71,9 @@ def test_channel_method_using_dephrasure():
                 desired += temp
             actual = channel.channel(rho, n)
             assert_array_almost_equal(actual, desired)
+
+    # Test constructor accepts the right input.
+    assert_raises(TypeError, AnalyticQChan, "asdsa", [1, 1], 2, 2)
 
 
 def test_entropy_exchange_dephrasure_channel():
@@ -107,12 +133,16 @@ def test_coherent_information_with_analytic_dephrasure():
     for sparse in [False, True]:
         channel = AnalyticQChan(single_krauss_ops, [1, 1], 2, 3, orthogonal_krauss_indices, sparse)
         for n in range(1, 4):
-            for lam in np.arange(0.001, 1., 0.01):
+            for lam in np.arange(0.001, 1., 0.1):
                 rho = np.zeros((2**n, 2**n), dtype=np.complex128)
                 rho[0, 0] = lam
                 rho[-1, -1] = 1. - lam
 
-                actual = channel.coherent_information(rho, n)
+                if n == 1:
+                    actual = channel.coherent_information(rho, n)
+                else:
+                    # Test regularized keyword.
+                    actual = channel.coherent_information(rho, n, regularized=True) * float(n)
                 desired = _analytic_solution(lam, n, p, q)
                 assert np.abs(desired - actual) < 1e-10
 
@@ -125,7 +155,7 @@ def test_maxima_first_coherent_information_dephrasure():
         return a / (2. - 4. * p - 2. * p * (1. - p) * np.log((1. - p) / p))
 
     desired = np.array([[0.5, 0.], [0., 0.5]])
-    for p in np.arange(0.01, 0.5, 0.05):
+    for p in np.arange(0.01, 0.5, 0.1):
         for q in np.arange(0., optima_mixed_state_bound(p), 0.1):
             # Set up actual results.
             single_krauss_ops = set_up_dephrasure_conditions(p, q)
@@ -189,8 +219,35 @@ def test_optimizing_coherent_information_with_amplitude_damping_channel():
         assert np.abs(actual["optimal_val"] - desired) < 1e-3
 
 
+def test_optimizing_coherent_information_bit_flip_channels_only_on_one_case():
+    r"""Test optimizing once coherent information with an analytic example for bit-flip channel."""
+    err = 0.1
+    krauss_1 = np.array([[1., 0.], [0., 1]], dtype=np.complex128) * np.sqrt(1 - err)
+    krauss_2 = np.array([[0., 1], [1., 0.]], dtype=np.complex128) * np.sqrt(err)
+    krauss_ops = [krauss_1, krauss_2]
+    desired = 1 + np.log2(err) * err + np.log2(1 - err) * (1 - err)
+
+    # Kraus Operators
+    for n in range(1, 3):
+        channel = AnalyticQChan(krauss_ops, [1, 1], 2, 2)
+        actual = channel.optimize_coherent(n=n, rank=2**n, param="cholesky", maxiter=100,
+                                           regularized=True)
+        assert np.abs(actual["optimal_val"] - desired) < 1e-3
+    # Test downgrading a n.
+    actual = channel.optimize_coherent(n=1, rank=2, param="overparam", maxiter=100)
+    assert np.abs(actual["optimal_val"] - desired) < 1e-3
+
+    # Choi matrices
+    choi_mat = sum([np.outer(np.ravel(x, order="F"),
+                             np.conj(np.ravel(x, order="F"))) for x in krauss_ops])
+    chan = AnalyticQChan(choi_mat, [1, 1], 2, 2)
+    actual = chan.optimize_coherent(n=1, rank=2, param="overparam", maxiter=100)
+    assert np.abs(actual["optimal_val"] - desired) < 1e-3
+    assert_raises(AssertionError, chan.optimize_coherent, 2, 2)
+
+
 @pytest.mark.slow
-def test_optimizing_coherent_information_pauli_channels():
+def test_optimizing_coherent_information_bit_flip_channels():
     r"""Test optimizing coherent information with an analytic example for bit-flip channel."""
     for err in np.arange(0.01, 1., 0.01):
         krauss_1 = np.array([[1., 0.], [0., 1]], dtype=np.complex128) * np.sqrt(1 - err)
@@ -237,48 +294,6 @@ def check_two_sets_of_krauss_are_same(krauss1, krauss2, numb=1000):
             break
     return is_same
 
-
-def test_creation_of_one_qubit_operators():
-    # Depolarizing Channel
-    px = 0.1
-    lams = np.array([1. - 4. * px, 1. - 4. * px, 1. - 4. * px])
-
-    I = np.eye(2) * np.sqrt(1 - 3. * px)
-    X = np.array([[0., 1.], [1., 0.]]) * np.sqrt(px)
-    Y = np.array([[0., complex(0, -1.)], [complex(0, 1.), 0.]]) * np.sqrt(px)
-    Z = np.array([[1., 0.], [0., -1.]]) * np.sqrt(px)
-
-    # Check with lamda parameters
-    channel = AnalyticQChan.one_qubit_channel(lams, np.array([0., 0., 0.]), pauli_errors=False)
-
-    # Check Trace-perserving
-    cond = sum([np.conj(x.T).dot(x) for x in channel.kraus_ops])
-    assert np.all(np.abs(cond - np.eye(2)) < 1e-5)
-
-    # Check Equivalence to depolarizing channel over random set.
-    assert check_two_sets_of_krauss_are_same([I, X, Y, Z], channel.kraus_ops)
-
-    # Check with Pauli-Errors
-    pauli_errors = np.array([px, px, px])
-    channel = AnalyticQChan.one_qubit_channel(pauli_errors,
-                                              np.array([0., 0., 0.]), pauli_errors=True)
-
-    # Check Equivalence to deplorizing channel over random set.
-    assert check_two_sets_of_krauss_are_same([I, X, Y, Z], channel.kraus_ops)
-
-
-def test_concatenation_of_two_channels():
-    r"""Test serial concatenation of two channels."""
-    p, q = 0.1, 0.2
-    k1 = [np.array([[1., 0.], [0., 1.]]), np.array([[0., complex(0, -1.)],
-                                                    [complex(0., 1.), 0.]])]
-    k2 = [np.array([[0., 1.], [1., 0.]]), np.array([[1., 0.], [0., -1.]])]
-    k1[0] *= np.sqrt(p)
-    k1[1] *= np.sqrt(1 - p)
-    k2[0] *= np.sqrt(q)
-    k2[1] *= np.sqrt(1 - q)
-
-    desired_result = []
 
 @pytest.mark.slow
 def test_minimum_fidelity_over_depolarizing_channel():
@@ -332,11 +347,10 @@ def test_minimum_fidelity_over_bit_flip():
         assert np.all(np.abs(desired - actual) < 1e-5)
 
 
-@pytest.mark.slow
 def test_minimum_fidelity_over_amplitude_damping():
     r"""Test Minimum fidelity over amplitude-damping channel."""
     # Example obtained from Nielsen and Chaung.
-    prob = np.arange(0., 1., 0.01)
+    prob = np.arange(0., 1., 0.5)
 
     for p in prob:
         # With Kraus Operators
@@ -347,15 +361,24 @@ def test_minimum_fidelity_over_amplitude_damping():
         chan = AnalyticQChan(kraus, [1, 1], 2, 2)
         desired = np.sqrt(1 - p)
 
-        actual = chan.optimize_fidelity(n=1)
+        actual = chan.optimize_fidelity(n=1, maxiter=100)
         assert np.all(np.abs(desired - actual["optimal_val"]) < 1e-5)
 
         # With Choi-Matrix
         choi_mat = sum([np.outer(np.ravel(x, order="F"),
                                  np.conj(np.ravel(x, order="F"))) for x in kraus])
         chan = AnalyticQChan(choi_mat, [1, 1], 2, 2)
-        actual = chan.optimize_fidelity(n=1)
-        assert np.all(np.abs(desired - actual["optimal_val"]) < 1e-5)
+        actual = chan.optimize_fidelity(n=1, maxiter=100)
+        assert np.all(np.abs(desired - actual["optimal_val"]) < 1e-3)
+        assert_raises(AssertionError, chan.optimize_fidelity, 2)
+
+
+def test_minimum_fidelity_over_identity_channel():
+    k0 = np.array([[1., 0.], [0., 1.]])
+    chan = AnalyticQChan([k0], [1, 1], 2, 2)
+    for n in range(1, 3):
+        actual = chan.optimize_fidelity(n, maxiter=100)
+        assert np.all(np.abs(1. - actual["optimal_val"]) < 1e-5)
 
 
 # Slow test
@@ -402,14 +425,160 @@ def test_optimizing_coherent_information_dephrasure_using_choi_matrix():
             # Test optimal coherent information value is the same as analytical example.
             desired_fun = (1. - 2. * q) * (-np.log2(0.5)) - (1. - q) * \
                 (-(1 - p) * np.log2(1 - p) - p * np.log2(p))
-            assert np.abs(actual["optimal_val"] - desired_fun) < 1e-5
+            assert np.abs(actual["optimal_val"] - desired_fun) < 1e-3
 
             # Test optimal rho is the same as analytical example
             actual = actual["optimal_rho"]
             assert_array_almost_equal(desired, actual, decimal=3)
 
 
+def test_qubit_condition():
+    r"""Test that qubit channels are recognized."""
+    # Not a qubit channel.
+    kraus = set_up_dephrasure_conditions(0.1, 0.2)
+    not_qubit_chan = AnalyticQChan(kraus, [1, 1], 2, 3)
+    assert not not_qubit_chan._is_qubit_channel()
+
+    # Qubit Channel.
+    err = 0.01
+    krauss_1 = np.sqrt(1 - err) * np.array([[1., 0.], [0., 1.]])
+    krauss_2 = np.sqrt(err) * np.array([[0., 1.], [1., 0.]])
+    qubit_chan = AnalyticQChan([krauss_1, krauss_2], [1, 1], 2, 2)
+    assert qubit_chan._is_qubit_channel()
+
+
+# def test_inverse_of_unitary_two_design():
+#     r"""Test inverse of unitary two design with the unitary two design is the identity."""
+#     eng = projectq.MainEngine()
+#     register = eng.allocate_qureg(4)
+#     eng.flush()  # Need to flush it in order to set_wavefunction
+#
+#     def identity(engine):
+#         pass
+#
+#     chan_dev = QDeviceChannel(eng, register, identity)
+#
+#     for _ in range(0, 100):
+#         for index, state in [(0, [0, 0, 0, 0]), (10, [0, 1, 0, 1]), (15, [1, 1, 1, 1])]:
+#             # Set the wave-function to match the basis state.
+#             zero = [0.] * (2**4)
+#             zero[index] = 1  # Turn Probability is one on the that basis state.
+#             eng.backend.set_wavefunction(zero, register)
+#             eng.flush()
+#
+#             epsilon = 1
+#             phases = chan_dev.approximate_unitary_two_design(epsilon)
+#             chan_dev.apply_inverse_of_unitary_two_design(phases)
+#
+#             All(Measure) | register
+#             results = [int(x) for x in register]
+#             assert np.all(results == state)
+#             eng.flush()
+
+
+# def test_average_fidelity_on_the_identity_channel():
+#     r"""Test that the average fidelity on the identity channel."""
+#     qubits = 4
+#     dim = 2**qubits
+#
+#     true_answer = (np.abs(np.trace(np.eye(dim))**2) + dim) / (dim**2 + dim)
+#
+#     # Construct the channel
+#     eng = projectq.MainEngine()
+#     register = eng.allocate_qureg(qubits)
+#     eng.flush()  # Need to flush it in order to set_wavefunction
+#     def identity(engine, register):pass
+#     chan_dev = QDeviceChannel(eng, register, identity)
+#
+#     fidelity = chan_dev.estimate_average_fidelity(100, 0.1)
+#     assert np.abs(fidelity - true_answer) < 1e-4
+
+
+# def test_average_fidelity_on_bit_flip_chanel():
+#     r"""Test the average fidelity of the bit flip map."""
+#     qubits = 1
+#     dim = 2**qubits
+#     for prob_error in [1, 0.5, 0.25]:  # Test different probabilities
+#         # Obtain the actual true answer
+#         kraus = [np.sqrt(1 - prob_error) * np.eye(dim),
+#                  np.sqrt(prob_error) * np.array([[0., 1.], [1., 0.]])]
+#         true_answer = (np.abs(np.trace(kraus[0]))**2 + np.abs(np.trace(kraus[1]))**2 + dim) /\
+#                       (dim**2 + dim)
+#
+#         # Construct the channel and perform average fidelity estimation.
+#         eng = projectq.MainEngine()
+#         register = eng.allocate_qureg(qubits)
+#         eng.flush()  # Need to flush it in order to set_wavefunction
+#
+#         def bit_flip(engine, register):
+#             rando = np.random.random()  # Get random number.
+#             if rando < prob_error:  # If it is less than probability of error.
+#                 XGate() | register
+#             engine.flush()
+#
+#         chan_dev = QDeviceChannel(eng, register, bit_flip)
+#
+#         fidelity = chan_dev.estimate_average_fidelity(1000, 0.1)
+#         assert np.abs(fidelity - true_answer) < 1. / np.sqrt(1000)
+
+
+def test_adding_channels_together():
+    r"""Test adding channels together."""
+    # Identity channel
+    kraus0 = [np.eye(2)]
+    chan1 = AnalyticQChan(kraus0, [1, 1], 2, 2)
+
+    # Dephrasure Channel
+    kraus = set_up_dephrasure_conditions(0.1, 0.2)
+    chan2 = AnalyticQChan(kraus, [1, 1], 2, 3)
+
+    # Raises error since they don't match.
+    assert_raises(TypeError, chan1.__add__, chan2)
+
+    # Identity channel first then
+    new_chan = chan2 + chan1
+    desired_kraus = [x.dot(kraus0[0]) for x in kraus]
+    assert np.all(np.abs(new_chan.kraus - np.array(desired_kraus)) < 1e-4)
+
+    # Test Sparse
+    chan2 = AnalyticQChan(kraus, [1, 1], 2, 3, sparse=True)
+    new_chan = chan2 + chan1
+    desired_kraus = [x.dot(kraus0[0]) for x in kraus]
+    assert np.all(np.abs(new_chan.kraus - np.array(desired_kraus)) < 1e-4)
+    assert new_chan.sparse
+
+
+def test_multipling_channels_together():
+    r"""Test multiplying channels together."""
+    # Identity channel
+    kraus0 = [np.eye(2)]
+    chan1 = AnalyticQChan(kraus0, [1, 1], 2, 2)
+
+    # Dephrasure Channel
+    kraus = set_up_dephrasure_conditions(0.1, 0.2)
+    chan2 = AnalyticQChan(kraus, [1, 1], 2, 3)
+
+    new_chan = chan1 * chan2
+    desired_kraus = [np.kron(kraus0[0], x) for x in kraus]
+    assert np.all(np.abs(new_chan.kraus - np.array(desired_kraus)) < 1e-4)
+
+    new_chan = chan2 * chan1
+    desired_kraus = [np.kron(x, kraus0[0]) for x in kraus]
+    assert np.all(np.abs(new_chan.kraus - np.array(desired_kraus)) < 1e-4)
+
+    # Test Sparse
+    chan2 = AnalyticQChan(kraus, [1, 1], 2, 3, sparse=True)
+    new_chan = chan2 * chan1
+    desired_kraus = [np.kron(x, kraus0[0]) for x in kraus]
+    assert np.all(np.abs(new_chan.kraus - np.array(desired_kraus)) < 1e-4)
+    assert new_chan.sparse
+
+
 if __name__ == "__main__":
+    test_multipling_channels_together()
+    # test_average_fidelity_on_bit_flip_chanel()
+    # test_average_fidelity_on_the_identity_channel()
+    # test_inverse_of_unitary_two_design()
     # test_optimizing_coherent_information_dephrasure_using_choi_matrix()
     # test_channel_method_using_dephrasure()
     # test_entropy_exchange_dephrasure_channel()
@@ -421,7 +590,7 @@ if __name__ == "__main__":
     # compare_lipschitz_slsqp_with_diffev()
     # test_creation_of_one_qubit_operators()
     # test_optimizing_coherent_information_erasure_using_choi_matrix()
-    test_optimizing_coherent_information_erasure_using_choi_matrix()
+    # test_optimizing_coherent_information_erasure_using_choi_matrix()
     # test_minimum_fidelity_over_depolarizing_channel()
     # test_minimum_fidelity_over_amplitude_damping()
     # test_minimum_fidelity_over_bit_flip()

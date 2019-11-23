@@ -1,11 +1,44 @@
+r"""
+The MIT License.
+
+Copyright (c) 2019-Present PyQCodes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
 import numpy as np
 from scipy.sparse import kron
 from sparse import COO, kron, tensordot, matmul, SparseArray
 from abc import ABC, abstractmethod, abstractstaticmethod
 
 r"""
-Two Classes for Kraus Operators. SparseKraus represents dealing with sparse matrices,
-and DenseKraus represents dealing with dense kraus operators.
+Kraus operators for representing Quantum Channels.
+
+Classes
+-------
+- Kraus :
+    Abstract Base Class
+- DenseKraus :
+    Kraus operators as dense matrices.
+- SparseKraus :
+    Kraus operators as sparse matrices.
+    
+The Functionality (what it can do) of DenseKraus is really similar to SparseKraus.
 """
 
 
@@ -13,13 +46,11 @@ __all__ = ["SparseKraus", "DenseKraus"]
 
 
 class Kraus(ABC):
-    r"""
-    Abstract Base Class for kraus Operators.
-    """
+    r"""Abstract Base Class for kraus Operators."""
 
     def __init__(self, kraus_ops, numb_qubits, dim_in, dim_out):
         r"""
-        Constructor of Abstract Base Class for Kraus Operators.
+        Construct of Abstract Base Class for Kraus Operators.
 
         Parameters
         ----------
@@ -40,14 +71,14 @@ class Kraus(ABC):
         TypeError
             Number of columns of each kraus operators should match dim_in**numb_qubits.
             Number of rows of each kraus operators should match dim_out**numb_qubits.
+
         """
         # Test the input conditions.
         if not isinstance(kraus_ops, (list, np.ndarray, SparseArray)):
             raise TypeError("Kraus operators should be a list or numpy array or sparse array.")
         # Assert that kraus operators be three-dimensional.
         if isinstance(kraus_ops, np.ndarray):
-            assert kraus_ops.ndim == 3, "Set of kraus operators should be three-dimensional numpy " \
-                                        "array."
+            assert kraus_ops.ndim == 3, "kraus operators should be three-dimensional numpy array."
         assert isinstance(numb_qubits, list), "Number of qubits should be an list."
         assert isinstance(numb_qubits[0], int), "Elements of numb_qubits should be Integer."
         assert isinstance(numb_qubits[1], int), "Elements of numb_qubits should be Integer."
@@ -87,6 +118,14 @@ class Kraus(ABC):
         return self.numb_kraus
 
     @property
+    def kraus_ops(self):
+        return self._kraus_ops
+
+    @kraus_ops.setter
+    def kraus_ops(self, kraus):
+        self._kraus_ops = kraus
+
+    @property
     def numb_qubits(self):
         return self._numb_qubits
 
@@ -100,13 +139,19 @@ class Kraus(ABC):
 
     @property
     def nth_kraus_ops(self):
-        # Return the kraus operators representing channel tensored n-times.
         return self._nth_kraus_ops
+
+    @nth_kraus_ops.setter
+    def nth_kraus_ops(self, kraus):
+        self._nth_kraus_ops = kraus
 
     @property
     def nth_kraus_ops_conj(self):
-        # Return kraus operators being hermitian tranposed. Used by SparseKraus.
         return self._nth_kraus_ops_conj
+
+    @nth_kraus_ops_conj.setter
+    def nth_kraus_ops_conj(self, kraus):
+        self.nth_kraus_ops_conj = kraus
 
     @property
     def nth_kraus_exch(self):
@@ -116,7 +161,7 @@ class Kraus(ABC):
     @abstractmethod
     def __add__(self, other):
         r"""
-        Serial Concatenation of two kraus operators sets B and A, where A is applied first then B.
+        Return Serial Concatenation of two kraus operators B and A, where A is applied first then B.
 
         Parameters
         ----------
@@ -143,6 +188,7 @@ class Kraus(ABC):
         # New channel with Input -> Identity -> Dephasing -> Output
         new_kraus = dephas + identity
         # Should be equivalent to dephasing channel.
+
         """
         pass
 
@@ -182,6 +228,7 @@ class Kraus(ABC):
         new_kraus = dephas * identity
         # Should be equivalent to applying dephasing channel on first qubit and identity on
         # second qubit.
+
         """
         pass
 
@@ -209,18 +256,22 @@ class Kraus(ABC):
         # To revert back to n = 1
         kraus_obj.update_kraus_operators(n=1)
         # Kraus operators when n=1 should be [k0, k1]
+
         """
         if self.current_n < n:
             # Update Densekraus operator to correspond to nth channel
             for i in range(self.current_n, n):
-                self._nth_kraus_ops = self._tensor_kraus_operators(self.kraus_ops,
-                                                                   self.nth_kraus_ops)
+                self.nth_kraus_ops = self._tensor_kraus_operators(self.kraus_ops,
+                                                                  self.nth_kraus_ops)
         elif n < self.current_n:
             # Reduce Densekraus operator to correspond to nth channel.
-            self._nth_kraus_ops = self._tensor_kraus_operators(self.kraus_ops, self.kraus_ops)
-            for i in range(0, n - 2):
-                self._nth_kraus_ops = self._tensor_kraus_operators(self.kraus_ops,
-                                                                   self.nth_kraus_ops)
+            if n == 1:
+                self.nth_kraus_ops = self.kraus_ops
+            else:
+                self.nth_kraus_ops = self._tensor_kraus_operators(self.kraus_ops, self.kraus_ops)
+                for i in range(0, n - 2):
+                    self.nth_kraus_ops = self._tensor_kraus_operators(self.kraus_ops,
+                                                                       self.nth_kraus_ops)
         # Update current n.
         self.current_n = n
         # Update the matrix for computing the entropy-exchange matrix.
@@ -318,10 +369,12 @@ class SparseKraus(Kraus):
     # Apply to dephrasure channel tensored two times on a diagonal two-qubit density matrix.
     rho = np.diag([0.25, 0.25, 0.25, 0.25])
     channel = kraus.channel(rho, n=2)
+
     """
+
     def __init__(self, kraus_ops, numb_qubits, dim_in=2, dim_out=2):
         r"""
-        Constructor for the kraus operators represented as sparse matrices.
+        Construct for the kraus operators represented as sparse matrices.
 
         Parameters
         ----------
@@ -335,17 +388,17 @@ class SparseKraus(Kraus):
         dim_out : int
             Dimension of a single-particle/qubit hilbert space of the output. For qubit, dimension
             is two by definition.
+
         """
-        # Store a copy of the single (n=1) kraus operators.
-        if not isinstance(kraus_ops, (list, np.ndarray, SparseArray)):
-            raise TypeError("Kraus operators should either be a list, numpy array or sparse array.")
-        self.kraus_ops = kraus_ops
         # If kraus operators aren't in sparse format.
         if isinstance(kraus_ops, (list, np.ndarray)):
             self.kraus_ops = COO(np.array(kraus_ops, dtype=np.complex128),)
+        else:
+            self.kraus_ops = kraus_ops
         super(SparseKraus, self).__init__(kraus_ops, numb_qubits, dim_in, dim_out)
 
     def __add__(self, other):
+        r"""Return Sparse Kraus from serial concatenation of two kraus operators."""
         assert isinstance(other, SparseKraus), "Kraus object should be of type 'SparseKraus'."
         if self.dim_in**self.numb_qubits[0] != other.dim_out**other.numb_qubits[1]:
             raise TypeError("Kraus operator dimension do not match.")
@@ -355,6 +408,7 @@ class SparseKraus(Kraus):
                            numb_qubits, dim_in, dim_out)
 
     def __mul__(self, other):
+        r"""Return Sparse Kraus from parallel concatenation of two kraus operators."""
         assert isinstance(other, SparseKraus), "Kraus object should be of type 'SparseKraus'."
         # Assert that dimensions of kraus operators match each other.
         # The number of qubits is reset to one.
@@ -371,7 +425,7 @@ class SparseKraus(Kraus):
         self._nth_kraus_ops_conj.enable_caching()
 
     def is_trace_perserving(self):
-        r"""True if kraus operators are trace-perserving."""
+        r"""Return true if kraus operators are trace-perserving."""
         length = self.kraus_ops[0].shape[1]
         trace_cond = np.zeros((length, length), dtype=np.complex128)
         for k in self.kraus_ops:
@@ -413,7 +467,8 @@ class SparseKraus(Kraus):
         -------
         list :
             Returns the complementary of the channel (ie trace one, positive-semidefinite,
-            hermitian matrix).
+            hermitian matrix) in sparse format.
+
         """
         if adjoint:
             rho_reshaped = rho.reshape((self.numb_kraus**n, self.numb_kraus**n, 1, 1))
@@ -437,7 +492,9 @@ class SparseKraus(Kraus):
         Returns
         -------
         array :
-            Compute the channel A (or adjoint A^{\dagger}) based on the kraus operators on rho.
+            Compute the sparse channel A (or adjoint A^{\dagger}) based on the kraus operators on
+            rho.
+
         """
         if adjoint:
             left_mult = matmul(self.nth_kraus_ops_conj, rho)
@@ -446,7 +503,7 @@ class SparseKraus(Kraus):
 
     def average_entanglement_fidelity(self, probs, states):
         r"""
-        Calculates average entanglement fidelity of an given ensemble.
+        Calculate average entanglement fidelity of an given ensemble.
 
         Equivalent to ensemble average fidelity.
 
@@ -466,6 +523,7 @@ class SparseKraus(Kraus):
         Notes
         -----
         Based on "arXiv:quant-ph/0004088".
+
         """
         avg_fid = 0.
         for i, p in enumerate(probs):
@@ -493,6 +551,7 @@ class SparseKraus(Kraus):
         Notes
         -----
         See Mark Wilde's book, "Quantum Information Theory"
+
         """
         assert isinstance(kraus1, (list, np.ndarray, SparseArray)), \
             "Kraus1 should be list or numpy array or sparse array."
@@ -508,7 +567,7 @@ class SparseKraus(Kraus):
     @staticmethod
     def serial_concatenate(kraus1, kraus2):
         r"""
-        Serial Concatenation of two kraus operators, A, B to produce "A composed B".
+        Return Serial Concatenation of two kraus operators, A, B to produce "A composed B".
 
         Parameters
         ----------
@@ -526,21 +585,17 @@ class SparseKraus(Kraus):
         Notes
         -----
         See Mark Wilde's book, "Quantum Information Theory"
+
         """
         assert isinstance(kraus1, (list, np.ndarray, SparseArray)), \
             "Kraus1 should be list or numpy array or sparse array."
-        assert isinstance(kraus2, (list, np.ndarray,SparseArray)), \
+        assert isinstance(kraus2, (list, np.ndarray, SparseArray)), \
             "Kraus2 should be list or numpy array or sparse array."
         # If they aren't in sparse
         if isinstance(kraus1, (list, np.ndarray)):
             kraus1 = COO(np.array(kraus1, dtype=np.complex128),)
         if isinstance(kraus2, (list, np.ndarray)):
             kraus2 = COO(np.array(kraus2, dtype=np.complex128),)
-        # Assert that kraus operators be three-dimensional.
-        if isinstance(kraus1, np.ndarray):
-            assert kraus1.ndim == 3, "Set of kraus operators should be three-dimensional np array."
-        if isinstance(kraus2, np.ndarray):
-            assert kraus2.ndim == 3, "Set of kraus operators should be three-dimensional np array."
 
         # Test that the dimensions of kraus operators match.
         for k2 in kraus2:
@@ -617,9 +672,10 @@ class DenseKraus(Kraus):
     channel = kraus.channel(rho, n=2)
 
     """
+
     def __init__(self, kraus_ops, numb_qubits, dim_in=2, dim_out=2, orthogonal_kraus=()):
         r"""
-        Constructor for the kraus operators represented as dense matrices.
+        Construct for the kraus operators represented as dense matrices.
 
         Parameters
         ----------
@@ -636,6 +692,7 @@ class DenseKraus(Kraus):
         orthogonal_kraus : list
             Set of M kraus operators \{A_1, ..., A_M\}. The list gives the index where the each
             group are orthogonal to one another.
+
         """
         if not isinstance(kraus_ops, (list, np.ndarray)):
             raise TypeError("Kraus operators should be a list or numpy array.")
@@ -646,7 +703,12 @@ class DenseKraus(Kraus):
         self._orthogonal_kraus = orthogonal_kraus
         super(DenseKraus, self).__init__(kraus_ops, numb_qubits, dim_in=dim_in, dim_out=dim_out)
 
+    @property
+    def orthogonal_kraus(self):
+        return self._orthogonal_kraus
+
     def __add__(self, other):
+        r"""Return kraus operators that are serially concatenate to one another."""
         # Assert that dimensions of kraus operators match each other.
         if not self.dim_in**self.numb_qubits[0] == other.dim_out**other.numb_qubits[1]:
             raise TypeError("Kraus operator dimension do not match.")
@@ -656,6 +718,7 @@ class DenseKraus(Kraus):
                           numb_qubits, dim_in, dim_out)
 
     def __mul__(self, other):
+        r"""Return kraus operators that are parallel concatenated with one another."""
         assert isinstance(other, DenseKraus), "Kraus object should be of type '.DenseKraus'."
         # Assert that dimensions of kraus operators match each other.
         # The number of qubits is reset to one.
@@ -665,7 +728,7 @@ class DenseKraus(Kraus):
                           numb_qubits, dim_in, dim_out)
 
     def is_trace_perserving(self):
-        r"""True if kraus operators are trace-perserving."""
+        r"""Return true if kraus operators are trace-perserving."""
         trace_cond = np.einsum("ikj, ijm-> km", np.conj(np.transpose(self.kraus_ops, (0, 2, 1))),
                                self.kraus_ops)
         length = self.kraus_ops[0].shape[1]
@@ -673,18 +736,16 @@ class DenseKraus(Kraus):
         return np.all(np.abs(trace_cond - np.eye(length)) < 1e-5)
 
     def _tensor_kraus_operators(self, array1, array2):
-        r"""
-        Tensor Sets of kraus operators together, See Parallel Concantenation.
-        """
+        r"""Tensor Sets of kraus operators together, See Parallel Concantenation."""
         return np.kron(array1, array2)
 
     def _kraus_operators_exchange(self, n):
-        r""" Helper function to set up the kraus operators needed for entropy exchange function."""
+        r"""Help set up the kraus operators needed for entropy exchange function."""
         self._nth_kraus_exch = np.tensordot(np.conj(np.transpose(self._nth_kraus_ops, (0, 2, 1))),
                                             self._nth_kraus_ops, axes=((2), (1))).swapaxes(1, 2)
 
     def _initialize_kraus_ops(self):
-        r""" Initialize the kraus operators for computation of channel and entropy exchange."""
+        r"""Initialize the kraus operators for computation of channel and entropy exchange."""
         self._nth_kraus_ops = self.kraus_ops.copy()
         self._nth_kraus_exch = np.tensordot(np.conj(np.transpose(self._nth_kraus_ops, (0, 2, 1))),
                                             self._nth_kraus_ops, axes=((2), (1))).swapaxes(1, 2)
@@ -710,6 +771,7 @@ class DenseKraus(Kraus):
             Compute the channel A based on the kraus operators on rho. If rho is two-dimensional,
             it returns two-dimensional A(rho). If rho is three-dimensional, it returns a
             three-dimensional array [A(rho_1), .., A(rho_M)].
+
         """
         assert isinstance(rho, np.ndarray), "Density State rho should be numpy array."
         if adjoint:
@@ -723,11 +785,12 @@ class DenseKraus(Kraus):
         # If want to compute the channel across many density matrices or just one density matrix.
         if rho.ndim == 2:
             kraus_mul_rho = np.matmul(left_multi, rho)
+            channel = np.matmul(kraus_mul_rho, right_multi)
+            channel = np.einsum("ijk->jk", channel)
         else:
             kraus_mul_rho = np.einsum("ijk,lkp->lijp", left_multi, rho)
-        channel = np.matmul(kraus_mul_rho, right_multi)
-
-        channel = np.einsum("ijk->jk", channel)
+            channel = np.einsum("lijp, ipm->lijm", kraus_mul_rho, right_multi)
+            channel = np.einsum("lijm->ljm", channel)
         return channel
 
     def entropy_exchange(self, rho, n, adjoint=False):
@@ -743,7 +806,8 @@ class DenseKraus(Kraus):
             Integer of the number of times the channel is tensored.
 
         adjoint : bool
-            Compute the adjoint of the complementary channel instead.
+            Compute the adjoint of the complementary channel instead. This doesn't use exploit
+            orthogonal kraus operators.
 
         Notes
         -----
@@ -774,46 +838,36 @@ class DenseKraus(Kraus):
         channel = kraus.entropy_exchange( some random density matrix rho)
         # Channel should be a list of two matrices [A_1, A_2], A_1 corresponds to {k_0}
         # and A_2 correponds to {k_1, k_2}.
+
         """
         numb_rows = self.numb_kraus ** n
+        # Compute adjoint of the complementary channel.
+        if adjoint:
+            return np.einsum("ijkl,ij->kl", self.nth_kraus_exch, rho, dtype=np.complex128)
 
-        if len(self._orthogonal_kraus) == 0:
-            # Compute adjoint of the complementary channel.
-            if adjoint:
-                return np.einsum("ijkl,ij->kl", self.nth_kraus_exch, rho, dtype=np.complex128)
-            else:
-                W = np.einsum("ijkl,lk->ij", self.nth_kraus_exch, rho, dtype=np.complex128)
-                return [W.T]
+        if len(self.orthogonal_kraus) == 0:
+            W = np.einsum("ijkl,lk->ij", self.nth_kraus_exch, rho, dtype=np.complex128)
+            return [W.T]
         else:
             output = []
             count = 0
-            for i in self._orthogonal_kraus:
+            for i in self.orthogonal_kraus:
                 orthogonal_split = i * self.numb_kraus ** (n - 1)
 
-                if adjoint:
-                    W = np.einsum("ijkl,ij->kl",  self.nth_kraus_exch[count:orthogonal_split,
-                                  count:orthogonal_split, :, :], rho, dtype=np.complex128)
-                    output.append(W)
-                else:
-                    W = np.einsum("ijkl,lk->ij",
-                                  self.nth_kraus_exch[count:orthogonal_split,
-                                  count:orthogonal_split, :, :], rho)
-                    output.append(W.T)
+                W = np.einsum("ijkl,lk->ij", self.nth_kraus_exch[count:orthogonal_split,
+                              count:orthogonal_split, :, :], rho)
+                output.append(W.T)
                 count += orthogonal_split
 
             # Last section of kraus operators
             diff = (numb_rows - count)
-            if adjoint:
-                W = np.einsum("ijkl,ij->kl", self.nth_kraus_exch[diff:, diff:, :, :], rho)
-                output.append(W)
-            else:
-                W = np.einsum("ijkl,lk->ij", self.nth_kraus_exch[diff:, diff:, :, :], rho)
-                output.append(W.T)
+            W = np.einsum("ijkl,lk->ij", self.nth_kraus_exch[diff:, diff:, :, :], rho)
+            output.append(W.T)
         return output
 
     def average_entanglement_fidelity(self, probs, states):
         r"""
-        Calculates average entanglement fidelity of an given ensemble.
+        Calculate average entanglement fidelity of an given ensemble.
 
         Equivalent to ensemble average fidelity.
 
@@ -833,6 +887,7 @@ class DenseKraus(Kraus):
         Notes
         -----
         Based on "arXiv:quant-ph/0004088".
+
         """
         avg_fid = 0.
         for i, p in enumerate(probs):
@@ -868,6 +923,7 @@ class DenseKraus(Kraus):
         k2 = np.array([I, Z])  # As numpy array
         k3 = DenseKraus.parallel_concatenate(k1, k2)  # Parallel Concatenate two kraus op sets.
         # k3 should be numpy array of [I tensor I, I tensor Z, X tensor I, X tensor Z]
+
         """
         # Convert list type to numpy array.
         if isinstance(kraus1, list):
@@ -910,6 +966,7 @@ class DenseKraus(Kraus):
         k2 = np.array([I, Z])  # As numpy array
         k3 = DenseKraus.serial_concatenate(k1, k2)  # Serial Concatenate of two kraus op sets.
         # k3 should be numpy array of [I, Z, X, X.dot(Z)]
+
         """
         assert isinstance(kraus1, (list, np.ndarray)), "Kraus1 should be list or numpy array."
         assert isinstance(kraus2, (list, np.ndarray)), "Kraus2 should be list or numpy array."
