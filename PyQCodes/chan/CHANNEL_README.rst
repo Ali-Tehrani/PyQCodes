@@ -30,6 +30,31 @@ General Properties
 
 Coherent Information
 --------------------
+This example shows how to calculate the one-shot (n=1) coherent information of the dephasing channel. It will be optimized using Scipy's Differential Evolution solver ("diffev") over rank two density matrices with a maximum iteration of 200.
+
+.. codeblock:: python
+
+   p = 0.25  
+   kraus_ops = [k0, k1, k2, k3]
+   numb_qubits = [1, 1]  # Accepts one qubits and outputs one qubits.
+   dim_in = 2  # Dimension of single qubit hilbert space is 2.
+   dim_out = 2  # Dimension of single qubit hilbert space after the dephasing channel is 2.
+   channel = AnalyticQChan(kraus_ops, numb_qubits, dim_in, dim_out)
+   coherent = channel.optimize_coherent(n=1, rank=2, optimizer="diffev", param="overparam",
+                                        maxiter=200)
+
+The next example shows how to optimize the two-shot (n=2) coherent information of the dephrasure channel. It will be optimized using SLSQP algorithm over rank four density matrices.
+
+.. codeblock:: python
+   :linenos:
+
+   p = 0.25  
+   kraus_ops = [k0, k1, k2, k3]
+   numb_qubits = [1, 1]  # Accepts one qubits and outputs one qubits.
+   dim_in = 2  # Dimension of single qubit hilbert space is 2.
+   dim_out = 3  # Dimension of single qubit hilbert space after the dephasing channel is 2.
+   channel = AnalyticQChan(kraus_ops, numb_qubits, dim_in, dim_out, sparse=True)
+   coherent = channel.optimize_coherent(n=2, rank=4, optimizer="slsqp", param="overparam", maxiter=200)
 
 Minimum Fidelity
 ----------------
