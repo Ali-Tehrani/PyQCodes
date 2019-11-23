@@ -24,7 +24,7 @@ Setting up Dephrasure Channel
 -----------------------------
 Consider the dephrasure channel $\mathcal{N} : \mathcal{L}(\mathcal{H}_2) 
 \rightarrow \mathcal{L}(\mathcal{H}_3)$ that maps a qubit to a qutrit. It was
- introduced in the [paper [1]][1]. It has the following action on qubit density 
+ introduced in the paper [^1]. It has the following action on qubit density 
  matrix $\rho$:
  
  $$
@@ -158,7 +158,7 @@ print("Optimal Value", results["optimal_val"])
 
 The same parameters as optimizing coherent information is applied here.
 
-See [documenation](channel.py) of the method 'optimize_fidelity' for more info.
+See [documentation](channel.py) of the method 'optimize_fidelity' for more info.
 
 
 Algorithm Information
@@ -195,9 +195,9 @@ If own wants to use their own parameterization this can be done by importing
 the abstract base class ParameterizationABC and implementing the three methods
 'numb_variables', 'bounds(nsize, rank)' and 'rho_from_vec(vec, nsize)'.
 
-Consider the following parameterization found in [paper [1]][1],   
+Consider the following parameterization found in paper [^1],   
 $$
-    rho = \delta|0\langle \rangle 0|^{\otimes nsize} + (1 - \delta) |1\langle\rangle 1|^{\otimes nsize}
+    \rho = \delta|0\rangle \langle 0|^{\otimes nsize} + (1 - \delta) |1\rangle\langle 1|^{\otimes nsize}
 $$
 It has one real variables and the delta is bounded from 0 to 1. 
 
@@ -235,7 +235,7 @@ doesn't work.
 Lipschitz
 ---------
 The coherent information is lipschitz with lipschitz constant 1. Using the 
-algorithm found in the [paper 2]][2]. 
+algorithm found in paper [^2]. 
 The lipschitz parameter will generate initial guesses based on the algorithm. 
 It will generate random density matirces and will save the random density 
 matrix if it satisfies the lipschitz condition to be used as an initial guess.
@@ -243,5 +243,6 @@ matrix if it satisfies the lipschitz condition to be used as an initial guess.
 
 References
 ==========
-[1] : Dephrasure channel and superadditivity of coherent information. By F.Leditzky, D. Leung and G. Smith.
-[2] : Global optimization of Lipschitz functions. By C. Malherbe and N. Vayatis.
+[^1]: Dephrasure channel and superadditivity of coherent information. By F.Leditzky, D. Leung and G. Smith.
+
+[^2]: Global optimization of Lipschitz functions. By C. Malherbe and N. Vayatis.
