@@ -23,7 +23,7 @@ Examples
 Setting up Dephrasure Channel
 -----------------------------
 Consider the dephrasure channel <img src="/PyQCodes/chan/tex/062ac33007e50544849e2c07322e45b6.svg?invert_in_darkmode&sanitize=true" align=middle width=145.93951679999998pt height=24.65753399999998pt/> that maps a qubit to a qutrit. It was
- introduced in the paper [^1]. It has the following action on qubit density 
+ introduced in the [paper [1]][1]. It has the following action on qubit density 
  matrix <img src="/PyQCodes/chan/tex/6dec54c48a0438a5fcde6053bdb9d712.svg?invert_in_darkmode&sanitize=true" align=middle width=8.49888434999999pt height=14.15524440000002pt/>:
  
  <p align="center"><img src="/PyQCodes/chan/tex/b1ddc8fa17ee69ad15f4eeb9bbaf8501.svg?invert_in_darkmode&sanitize=true" align=middle width=363.52370175pt height=16.438356pt/></p>
@@ -39,12 +39,12 @@ from PyQCodes.chan.channel import AnalyticQChan
 p, q = 0.1, 0.2
 krauss_1 = np.array([[1., 0.], [0., 1.], [0., 0.]])
 krauss_2 = np.array([[1., 0.], [0., -1.], [0., 0.]])
-krauss_4 = np.array([[0., 0.], [0., 0.], [1., 0.]])
-krauss_5 = np.array([[0., 0.], [0., 0.], [0., 1.]])
+krauss_3 = np.array([[0., 0.], [0., 0.], [1., 0.]])
+krauss_4 = np.array([[0., 0.], [0., 0.], [0., 1.]])
 krauss_ops = [krauss_1 * np.sqrt((1 - p) * (1 - q)),
               krauss_2 * np.sqrt((1 - q) * p),
-              np.sqrt(q) * krauss_4,
-              np.sqrt(q) * krauss_5]
+              np.sqrt(q) * krauss_3,
+              np.sqrt(q) * krauss_4]
 
 # Set up parameters
 numb_qubits = [1, 1]  # It maps one qubit to one qubit.
@@ -91,7 +91,8 @@ new_channel = chan2 * chan1
 # Note that the new channel will always assume it will map one qubit to one qubit.
 ```
 
-Note that The complementary channel <img src="/PyQCodes/chan/tex/58f51d09f8378a6f3489037e62d8c81a.svg?invert_in_darkmode&sanitize=true" align=middle width=21.78450779999999pt height=22.465723500000017pt/> maps a density matrix to the environment system, 
+Note that the complementary channel <img src="/PyQCodes/chan/tex/58f51d09f8378a6f3489037e62d8c81a.svg?invert_in_darkmode&sanitize=true" align=middle width=21.78450779999999pt height=22.465723500000017pt/> maps a density matrix to 
+the environment system, 
 here it is defined as the matrix with ith jth entries as <img src="/PyQCodes/chan/tex/df282f8934e95b9d00b6ab0684924d90.svg?invert_in_darkmode&sanitize=true" align=middle width=82.66960515pt height=31.780732499999996pt/>  
 
 Coherent Information
@@ -101,12 +102,13 @@ The coherent information of a channel <img src="/PyQCodes/chan/tex/2df4fb76c1e88
 <p align="center"><img src="/PyQCodes/chan/tex/36f64438508a7129a7db6deda1aa5b30.svg?invert_in_darkmode&sanitize=true" align=middle width=251.23687214999998pt height=24.4292268pt/></p>
 
 Maximization is done by parameterizing rank-k density matrices (See 
-[below](#parameterization)). Using the dephrasure example above.
+[below](#parameterization)) using the OverParameterization. Using the 
+dephrasure example above.
 
 ```python
 results = channel.optimize_coherent(n=2, rank=4, optimizer="diffev", 
-                                    lipschitz=50, use_pool=3, maxiter=100, 
-                                    disp=True)
+                                    param="overparam", lipschitz=50, 
+                                    use_pool=3, maxiter=100, disp=True)
 print("Is successful: ", results["success"])
 print("Optimal rho", results["optimal_rho"])
 print("Optimal Value", results["optimal_val"])
@@ -116,7 +118,7 @@ optimize over the highest rank. The optimization procedure will use "differentia
 sizes using the lipschitz sampler. It will execute 3 processes from the 
 multiprocessing library to run it faster and will have a maximum iteration of 100.
 The disp keyword will print the results as the optimization procedure 
-progresses.
+progresses. "overparam" means it will use OverParameterization.
 
 See [documentation](channel.py) of the method 'optimize_coherent' 
 for more info.
@@ -156,14 +158,80 @@ Algorithm Information
 
 Parameterization
 ----------------
-There are two different parameterization done, OverParameterization and 
-Cholesky Parameterization.
+This section is concerned with how the density matrices are parameterization.
+These are located in the [file](param.py).
+
+There are three options:
+
+Parameterization | Advantages
+------------ | -------------
+OverParameterization | More Variables, seems to outperform Choleskly.
+CholesklyParameterization | Less Variables, seems less accurate.
+Own Parameterization | Freedom of choice but need to code.
 
 
-Lipschitz Properties
---------------------
+OverParameterization and Choleskly Parameterization depend on the following 
+fact that all rank-k positive semidefinite matrices <img src="/PyQCodes/chan/tex/53d147e7f3fe6e47ee05b88b166bd3f6.svg?invert_in_darkmode&sanitize=true" align=middle width=12.32879834999999pt height=22.465723500000017pt/> of size <img src="/PyQCodes/chan/tex/3add1221abfa79cb14021bc2dacd5725.svg?invert_in_darkmode&sanitize=true" align=middle width=39.82494449999999pt height=19.1781018pt/> can
+ be written as <img src="/PyQCodes/chan/tex/7eeee95dc21cf8e1e43c1a023cf54f12.svg?invert_in_darkmode&sanitize=true" align=middle width=29.223808349999988pt height=27.91243950000002pt/> where <img src="/PyQCodes/chan/tex/ddcb483302ed36a59286424aa5e0be17.svg?invert_in_darkmode&sanitize=true" align=middle width=11.18724254999999pt height=22.465723500000017pt/> is a size <img src="/PyQCodes/chan/tex/a1f0b53bf045e54fc9cb8a2ef4b87b6c.svg?invert_in_darkmode&sanitize=true" align=middle width=39.03342959999999pt height=22.831056599999986pt/> complex matrix.
+ 
+The OverParameterization method models <img src="/PyQCodes/chan/tex/ddcb483302ed36a59286424aa5e0be17.svg?invert_in_darkmode&sanitize=true" align=middle width=11.18724254999999pt height=22.465723500000017pt/> as a <img src="/PyQCodes/chan/tex/3deeb85c12b1dab52ce039dacaaaf2e3.svg?invert_in_darkmode&sanitize=true" align=middle width=27.16144859999999pt height=22.831056599999986pt/> vector, where the two
+is because every complex number is two real-vectors.
+  
+The CholesklyParameterization method models <img src="/PyQCodes/chan/tex/ddcb483302ed36a59286424aa5e0be17.svg?invert_in_darkmode&sanitize=true" align=middle width=11.18724254999999pt height=22.465723500000017pt/> as a lower-triangular 
+matrix and is modelled by a  <img src="/PyQCodes/chan/tex/fa5c3ab74b51ecc1ab52a156041b801a.svg?invert_in_darkmode&sanitize=true" align=middle width=177.61774469999997pt height=24.65753399999998pt/> real-vector.
+
+Each real-variable in the matrix <img src="/PyQCodes/chan/tex/ddcb483302ed36a59286424aa5e0be17.svg?invert_in_darkmode&sanitize=true" align=middle width=11.18724254999999pt height=22.465723500000017pt/> is bounded from -1 to 1. Furthermore,
+to insure trace one, the matrix <img src="/PyQCodes/chan/tex/53d147e7f3fe6e47ee05b88b166bd3f6.svg?invert_in_darkmode&sanitize=true" align=middle width=12.32879834999999pt height=22.465723500000017pt/> is <img src="/PyQCodes/chan/tex/cb7b717a8c7d6e14ff6568100f6df543.svg?invert_in_darkmode&sanitize=true" align=middle width=99.2145264pt height=27.91243950000002pt/>.
+
+If own wants to use their own parameterization this can be done by importing 
+the abstract base class ParameterizationABC and implementing the three methods
+'numb_variables', 'bounds(nsize, rank)' and 'rho_from_vec(vec, nsize)'.
+
+Consider the following parameterization found in [paper [1]][1],   
+<p align="center"><img src="/PyQCodes/chan/tex/79ed363b4e45187d10b66cd7d8c587d9.svg?invert_in_darkmode&sanitize=true" align=middle width=286.29653745pt height=18.51100845pt/></p>
+It has one real variables and the delta is bounded from 0 to 1. 
+
+```python
+import numpy as np
+from PyQCodes.chan.param import ParameterizationABC
+
+
+class MyParametization(ParameterizationABC):
+    def numb_variables(self, nsize):
+        # Doesn't depend on size of density matrix.
+        return 1
+        
+    def bounds(nsize):
+        # Doesn't depend on size of density matrix.
+        return [(0, 1.)]
+    
+    def rho_from_vec(vec, nsize):
+        delta = vec[0]
+        diagonal = [vec[0]] + [0.] * (nsize - 1) + [1 - vec[0]]
+        return np.diag(diagonal) # Construct the diagonal matrix.
+        
+    def random_vectors(nsize, _):
+        # Return a random number from zero to one.
+        return np.random.uniform(0, 1)
+    
+
+# It can be used as follows.
+channel.optimize_coherent(n=2, rank=4, optimizer="diffev", 
+                          param=MyParametization, maxiter=100, disp=True)
+```
+Note that if "random_vectors" is not implemented, then lipschitz parameter 
+doesn't work.
+     
+Lipschitz
+---------
+The coherent information is lipschitz with lipschitz constant 1. Using the 
+algorithm found in the [paper 2]][2]. 
+The lipschitz parameter will generate initial guesses based on the algorithm. 
+It will generate random density matirces and will save the random density 
+matrix if it satisfies the lipschitz condition to be used as an initial guess.
 
 
 References
 ==========
-[^1] : Dephrasure channel and superadditivity of coherent information. By F.Leditzky, D. Leung and G. Smith.
+[1] : Dephrasure channel and superadditivity of coherent information. By F.Leditzky, D. Leung and G. Smith.
+[2] : Global optimization of Lipschitz functions. By C. Malherbe and N. Vayatis.
