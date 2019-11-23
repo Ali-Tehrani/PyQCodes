@@ -24,7 +24,7 @@ Setting up Dephrasure Channel
 -----------------------------
 Consider the dephrasure channel $\mathcal{N} : \mathcal{L}(\mathcal{H}_2) 
 \rightarrow \mathcal{L}(\mathcal{H}_3)$ that maps a qubit to a qutrit. It was
- introduced in the paper [^1]. It has the following action on qubit density 
+ introduced in the [paper [1]][1]. It has the following action on qubit density 
  matrix $\rho$:
  
  $$
@@ -43,12 +43,12 @@ from PyQCodes.chan.channel import AnalyticQChan
 p, q = 0.1, 0.2
 krauss_1 = np.array([[1., 0.], [0., 1.], [0., 0.]])
 krauss_2 = np.array([[1., 0.], [0., -1.], [0., 0.]])
-krauss_4 = np.array([[0., 0.], [0., 0.], [1., 0.]])
-krauss_5 = np.array([[0., 0.], [0., 0.], [0., 1.]])
+krauss_3 = np.array([[0., 0.], [0., 0.], [1., 0.]])
+krauss_4 = np.array([[0., 0.], [0., 0.], [0., 1.]])
 krauss_ops = [krauss_1 * np.sqrt((1 - p) * (1 - q)),
               krauss_2 * np.sqrt((1 - q) * p),
-              np.sqrt(q) * krauss_4,
-              np.sqrt(q) * krauss_5]
+              np.sqrt(q) * krauss_3,
+              np.sqrt(q) * krauss_4]
 
 # Set up parameters
 numb_qubits = [1, 1]  # It maps one qubit to one qubit.
@@ -95,7 +95,8 @@ new_channel = chan2 * chan1
 # Note that the new channel will always assume it will map one qubit to one qubit.
 ```
 
-Note that The complementary channel $\mathcal{N}^c$ maps a density matrix to the environment system, 
+Note that the complementary channel $\mathcal{N}^c$ maps a density matrix to 
+the environment system, 
 here it is defined as the matrix with ith jth entries as $Tr(A_i \rho A_j^\dagger).$  
 
 Coherent Information
@@ -107,12 +108,13 @@ $$
 $$
 
 Maximization is done by parameterizing rank-k density matrices (See 
-[below](#parameterization)). Using the dephrasure example above.
+[below](#parameterization)) using the OverParameterization. Using the 
+dephrasure example above.
 
 ```python
 results = channel.optimize_coherent(n=2, rank=4, optimizer="diffev", 
-                                    lipschitz=50, use_pool=3, maxiter=100, 
-                                    disp=True)
+                                    param="overparam", lipschitz=50, 
+                                    use_pool=3, maxiter=100, disp=True)
 print("Is successful: ", results["success"])
 print("Optimal rho", results["optimal_rho"])
 print("Optimal Value", results["optimal_val"])
@@ -122,7 +124,7 @@ optimize over the highest rank. The optimization procedure will use "differentia
 sizes using the lipschitz sampler. It will execute 3 processes from the 
 multiprocessing library to run it faster and will have a maximum iteration of 100.
 The disp keyword will print the results as the optimization procedure 
-progresses.
+progresses. "overparam" means it will use OverParameterization.
 
 See [documentation](channel.py) of the method 'optimize_coherent' 
 for more info.
@@ -164,14 +166,82 @@ Algorithm Information
 
 Parameterization
 ----------------
-There are two different parameterization done, OverParameterization and 
-Cholesky Parameterization.
+This section is concerned with how the density matrices are parameterization.
+These are located in the [file](param.py).
+
+There are three options:
+
+Parameterization | Advantages
+------------ | -------------
+OverParameterization | More Variables, seems to outperform Choleskly.
+CholesklyParameterization | Less Variables, seems less accurate.
+Own Parameterization | Freedom of choice but need to code.
 
 
-Lipschitz Properties
---------------------
+OverParameterization and Choleskly Parameterization depend on the following 
+fact that all rank-k positive semidefinite matrices $A$ of size $n \times n$ can
+ be written as $L^\dagger L$ where $L$ is a size $k \times n$ complex matrix.
+ 
+The OverParameterization method models $L$ as a $2 kn$ vector, where the two
+is because every complex number is two real-vectors.
+  
+The CholesklyParameterization method models $L$ as a lower-triangular 
+matrix and is modelled by a  $k(k+ 1) + 2(n - k)k - k$ real-vector.
+
+Each real-variable in the matrix $L$ is bounded from -1 to 1. Furthermore,
+to insure trace one, the matrix $A$ is $L^\dagger L / Tr(L^\dagger L)$.
+
+If own wants to use their own parameterization this can be done by importing 
+the abstract base class ParameterizationABC and implementing the three methods
+'numb_variables', 'bounds(nsize, rank)' and 'rho_from_vec(vec, nsize)'.
+
+Consider the following parameterization found in [paper [1]][1],   
+$$
+    rho = \delta|0\langle \rangle 0|^{\otimes nsize} + (1 - \delta) |1\langle\rangle 1|^{\otimes nsize}
+$$
+It has one real variables and the delta is bounded from 0 to 1. 
+
+```python
+import numpy as np
+from PyQCodes.chan.param import ParameterizationABC
+
+
+class MyParametization(ParameterizationABC):
+    def numb_variables(self, nsize):
+        # Doesn't depend on size of density matrix.
+        return 1
+        
+    def bounds(nsize):
+        # Doesn't depend on size of density matrix.
+        return [(0, 1.)]
+    
+    def rho_from_vec(vec, nsize):
+        delta = vec[0]
+        diagonal = [vec[0]] + [0.] * (nsize - 1) + [1 - vec[0]]
+        return np.diag(diagonal) # Construct the diagonal matrix.
+        
+    def random_vectors(nsize, _):
+        # Return a random number from zero to one.
+        return np.random.uniform(0, 1)
+    
+
+# It can be used as follows.
+channel.optimize_coherent(n=2, rank=4, optimizer="diffev", 
+                          param=MyParametization, maxiter=100, disp=True)
+```
+Note that if "random_vectors" is not implemented, then lipschitz parameter 
+doesn't work.
+     
+Lipschitz
+---------
+The coherent information is lipschitz with lipschitz constant 1. Using the 
+algorithm found in the [paper 2]][2]. 
+The lipschitz parameter will generate initial guesses based on the algorithm. 
+It will generate random density matirces and will save the random density 
+matrix if it satisfies the lipschitz condition to be used as an initial guess.
 
 
 References
 ==========
-[^1] : Dephrasure channel and superadditivity of coherent information. By F.Leditzky, D. Leung and G. Smith.
+[1] : Dephrasure channel and superadditivity of coherent information. By F.Leditzky, D. Leung and G. Smith.
+[2] : Global optimization of Lipschitz functions. By C. Malherbe and N. Vayatis.
