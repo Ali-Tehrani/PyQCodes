@@ -1,6 +1,6 @@
-================
+========
 PyQCodes
-===============
+========
 
 Insert a paragraph on what it does
 

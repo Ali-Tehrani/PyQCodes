@@ -1,4 +1,4 @@
+.. _code_readme:
 ====
 CODE
 ====
-.. _code_readme:

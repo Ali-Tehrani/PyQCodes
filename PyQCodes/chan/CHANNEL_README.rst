@@ -1,7 +1,7 @@
+.. _channel_readme:
 ==================
 Quantum Channels
 ==================
-.. _channel_readme:
 
 Overview
 ========
