@@ -15,18 +15,43 @@ Guide To Do
 * Stabilizer Codes.  See [file for more info](PyQCodes/CODE_README.md).
     - Find Logical Operators.
     - Apply Encoding, Measurement, and Decoding Circuit.
-* Optimization-Based Codes.  See :ref:`_code_readme`.
+* Optimization-Based Codes.  See [file for more info](PyQCodes/CODE_README.md).
     - Optimizes the average fidelity over Recover/Encoding operators.
     - Effective Channel Method of Stabilizer Codes.
 
 Examples
 --------
+Consider the bit-flip channel $\mathcal{N} : \mathcal{L}(\mathcal{H_A} \rightarrow \mathcal{H_B})$ acting on a density matrix $\rho$:
+    $$\mathcal{N}(\rho) = (1 - p)\rho + p X \rho X.$$
+    
+```python
+import numpy as np
+from PyQCodes.chan.channel import AnalyticQChan
 
-Getting Started
-===============
+p = 0.25  # Probability of error.
+kraus = [(1- p) * np.eye(2), p * np.array([[0., 1.], [1., 0.]])]
+dim = 2, 2  # Dimension of H_A and H_B, respectively.
+qubits = [1, 1]  # Maps one qubit to one qubit.
+channel = AnalyticQChan(kraus, qubits, dim[0], dim[1])
+```
 
-Prerequisites
--------------
+Bit-flip channel is a unital channel, ie $\mathcal{N}(I) = I$. This can be seen by:
+
+```python
+rho = np.eye(2)
+new_rho = channel.channel(rho, n=1)
+print(new_rho)  # Should be identity.
+channel.entropy()
+```
+
+The 2-shot coherent information or minimum fidelity of $\mathcal{N}^{\otimes 2}$ can be optimized.
+```python
+result = channel.optimize_coherent(n=2, rank=4, maxiter=100, disp=True)
+# result = channel.optimize_fidelity(n=2, maxiter=100,)
+print("Is successful: ", result["success"])
+print("Optimal rho", result["optimal_rho"])
+print("Optimal Value", result["optimal_val"])
+```
 
 Installing
 ----------
@@ -57,7 +82,7 @@ Acknowledgements
 =================
 TODO
 
+
 Contact Info
 ============
 If any questions, feel free to open up an issue or email at "atehrani@uoguelph.ca"
-
