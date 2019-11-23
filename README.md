@@ -7,12 +7,12 @@ minimum fidelity, certain optimization-based codes and stabilizer codes.
 
 Guide To Do
 -----------
-* Quantum Channels. See [file for more info](PyQCodes/chan/CHANNEL_README.md).
+* Quantum Channels. See [file for more info](PyQCodes/chan/README.md).
     - Compute Channel, Adjoint of Channel.
     - Compute Complementary Channel and Adjoint of Complementary Channel.
     - Optimize Coherent Information and Minimum Fidelity.
     - Serial/Parallel concatenate two channels .
-* Stabilizer Codes.  See [file for more info](PyQCodes/CODE_README.md).
+* Stabilizer Codes.  See [file for more info](PyQCodes/README.md).
     - Find Logical Operators.
     - Apply Encoding, Measurement, and Decoding Circuit.
 * Optimization-Based Codes.  See [file for more info](PyQCodes/CODE_README.md).
@@ -22,7 +22,10 @@ Guide To Do
 Examples
 --------
 Consider the bit-flip channel <img src="/tex/60eeab20dca4be5e5498159d0777700c.svg?invert_in_darkmode&sanitize=true" align=middle width=128.22161384999998pt height=24.65753399999998pt/> acting on a density matrix <img src="/tex/6dec54c48a0438a5fcde6053bdb9d712.svg?invert_in_darkmode&sanitize=true" align=middle width=8.49888434999999pt height=14.15524440000002pt/>:
-    $$\mathcal{N}(\rho) = (1 - p)\rho + p X \rho X.$$
+
+$$
+\mathcal{N}(\rho) = (1 - p)\rho + p X \rho X.
+$$
     
 ```python
 import numpy as np
