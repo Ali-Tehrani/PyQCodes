@@ -6,15 +6,15 @@ PyQCodes provides a set of functions to investigate coherent information, minimu
 
 Guide To Do
 -----------
-* Quantum Channels. See [file for more info](PyQCodes/chan/CHANNEL_README.md).
+* Quantum Channels. See [file for more info](PyQCodes/chan/README.md).
     - Compute Channel, Adjoint of Channel.
     - Compute Complementary Channel and Adjoint of Complementary Channel.
     - Optimize Coherent Information and Minimum Fidelity.
     - Serial/Parallel concatenate two channels .
-* Stabilizer Codes.  See [file for more info](PyQCodes/CODE_README.md).
+* Stabilizer Codes.  See [file for more info](PyQCodes/README.md).
     - Find Logical Operators.
     - Apply Encoding, Measurement, and Decoding Circuit.
-* Optimization-Based Codes.  See [file for more info](PyQCodes/CODE_README.md).
+* Optimization-Based Codes.  See [file for more info](PyQCodes/README.md).
     - Optimizes the average fidelity over Recover/Encoding operators. Based on [^1]
     - Effective Channel Method of Stabilizer Codes. Based on [^2] and [^3].
 
@@ -80,7 +80,7 @@ Then going to the PyQCode directory run
 Finally, it is recommended to run the tests to see if it installed correctly.
 
 ```bash
-    pytest -m "not slow -v
+    pytest -m "not slow" -v
 ```
 
 License
