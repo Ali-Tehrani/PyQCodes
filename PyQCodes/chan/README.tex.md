@@ -16,24 +16,24 @@ It has the following properties and methods that can be of used.
 - Model kraus operators as sparse matrices.
 - Calculate the average fidelity of a channel with respect to an ensemble.
 
-
+See the code [documentation](channel.py) of AnalyticQChan for more information.
 
 Examples
 ========
 Setting up Dephrasure Channel
 -----------------------------
-Consider the dephrasure channel $\mathcal{N} : \mathcal{L}(\mathcal{H_2}) 
-\rightarrow \mathcal{L}(\mathcal{H_3})$ that maps a qubit to a qutrit. It was
+Consider the dephrasure channel $\mathcal{N} : \mathcal{L}(\mathcal{H}_2) 
+\rightarrow \mathcal{L}(\mathcal{H}_3)$ that maps a qubit to a qutrit. It was
  introduced in the paper [^1]. It has the following action on qubit density 
  matrix $\rho$:
  
  $$
- \mathcal{N}(\rho) = (1 - p)(1 - q) I \rho I + p(1 - q)Z \rho Z + q |e\langle
-  \rangle e|.
+ \mathcal{N}(\rho) = (1 - p)(1 - q) I \rho I + p(1 - q)Z \rho Z + q |e\rangle
+  \langle e|.
  $$
  
  It has four kraus operators, the first two relating to I and Z and the last 
- two relating to erasure $|e\langle\rangle e|$.
+ two relating to erasure $|e\rangle\langle e|$.
  
  ```python
 import numpy as np
@@ -58,16 +58,15 @@ dim_out = 3  # Dimension of output H_3 (qutrit).
 channel = AnalyticQChan(krauss_ops, numb_qubits, dim_in, dim_out, sparse=False)
 ```
 
-The sparse keyword turns teh kraus operators into sparse matrices. It is recommended to use this when the number of kraus operators are large and sparse.
+The sparse keyword turns the kraus operators into sparse matrices. It is 
+recommended to use this when the number of kraus operators are large and sparse.
 
 
 General Properties
 ------------------
-The AnalyticQChan object can compute the channel $\mathcal{N}(\rho)$, the complementary channel $\mathcal{N^c}(\rho)$, and adjoint of each of these 
+The AnalyticQChan object can compute the channel $\mathcal{N}(\rho)$, the 
+complementary channel $\mathcal{N}^c(\rho)$, and adjoint of each of these 
 matrices. And it is able to compute channel $\mathcal{N}^{\otimes n}$ tensored n times (although it grows fast!).
-
-The complementary channel $\mathcal{N}^c$ maps a density matrix to the environment system, here it is defined as the matrix with ith jth entries as 
-$Tr(A_i \rho A_j^\dagger).$  
 
 ```python
 rho = np.array([[0.5, 0.2 + 0.3j], [0.2 - 0.3j, 0.5]])
@@ -96,6 +95,9 @@ new_channel = chan2 * chan1
 # Note that the new channel will always assume it will map one qubit to one qubit.
 ```
 
+Note that The complementary channel $\mathcal{N}^c$ maps a density matrix to the environment system, 
+here it is defined as the matrix with ith jth entries as $Tr(A_i \rho A_j^\dagger).$  
+
 Coherent Information
 --------------------
 The coherent information of a channel $I_c(\mathcal{N})$ is defined to be
@@ -104,7 +106,7 @@ $$
     I_c(\mathcal{N}) = \max_{\rho} S(\mathcal{N}(\rho)) - S(\mathcal{N}^c(\rho)).
 $$
 
-Maximization is done using by parameterizing rank-k density matrices (See 
+Maximization is done by parameterizing rank-k density matrices (See 
 [below](#parameterization)). Using the dephrasure example above.
 
 ```python
@@ -117,15 +119,19 @@ print("Optimal Value", results["optimal_val"])
 ```
 This will optimize coherent information of $\mathcal{N}^{\otimes 2}$ over rank four (the highest rank) density matrices. It is generally recommended to
 optimize over the highest rank. The optimization procedure will use "differential_evolution" from Scipy. It will generate 50 initial population 
-sizes using the lipschitz sampler. It will execute 3 processes to run it faster and will have a maximum iteration of 100.
+sizes using the lipschitz sampler. It will execute 3 processes from the 
+multiprocessing library to run it faster and will have a maximum iteration of 100.
 The disp keyword will print the results as the optimization procedure 
 progresses.
 
-See [documenation](PyQCodes/chan/channel.py) of the method 'optimize_coherent' for more info.
+See [documentation](channel.py) of the method 'optimize_coherent' 
+for more info.
 
 It is highly recommended to use lipschitz sampler and use_pool and to optimize over the highest rank.
 Furthermore, using lipschitz sampler and optimizer="slsqp" generally outperforms "differential_evolution".
-For large n, you may need to reconstruct the AnalyticQChan using the sparse keyword.
+For large n, you may need to reconstruct the AnalyticQChan using the sparse 
+keyword as True. This does not guarantee to find the global optima, but it 
+will find a local maxima.
 
 
 Minimum Fidelity
@@ -134,7 +140,7 @@ The fidelity of a quantum state $\rho$ with respect to a channel
 $\mathcal{N}$ is:
 
 $$
- F(\rho, \mathcal{N}(\rho)) = Tr\bigg(\sqrt{\sqrt{\rho}\mathcal{N}\sqrt{\rho}}\bigg)
+ F(\rho, \mathcal{N}(\rho)) = Tr\bigg(\sqrt{\sqrt{\rho}\mathcal{N}(\rho)\sqrt{\rho}}\bigg)
 $$
 The minimum fidelity is the minimum of the fidelity of a channel over rank one density matrices.
 
@@ -150,7 +156,7 @@ print("Optimal Value", results["optimal_val"])
 
 The same parameters as optimizing coherent information is applied here.
 
-See [documenation](PyQCodes/chan/channel.py) of the method 'optimize_fidelity' for more info.
+See [documenation](channel.py) of the method 'optimize_fidelity' for more info.
 
 
 Algorithm Information
