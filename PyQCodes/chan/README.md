@@ -23,7 +23,7 @@ Examples
 Setting up Dephrasure Channel
 -----------------------------
 Consider the dephrasure channel <img src="/PyQCodes/chan/tex/062ac33007e50544849e2c07322e45b6.svg?invert_in_darkmode&sanitize=true" align=middle width=145.93951679999998pt height=24.65753399999998pt/> that maps a qubit to a qutrit. It was
- introduced in the [paper [1]][1]. It has the following action on qubit density 
+ introduced in the paper [^1]. It has the following action on qubit density 
  matrix <img src="/PyQCodes/chan/tex/6dec54c48a0438a5fcde6053bdb9d712.svg?invert_in_darkmode&sanitize=true" align=middle width=8.49888434999999pt height=14.15524440000002pt/>:
  
  <p align="center"><img src="/PyQCodes/chan/tex/b1ddc8fa17ee69ad15f4eeb9bbaf8501.svg?invert_in_darkmode&sanitize=true" align=middle width=363.52370175pt height=16.438356pt/></p>
@@ -150,7 +150,7 @@ print("Optimal Value", results["optimal_val"])
 
 The same parameters as optimizing coherent information is applied here.
 
-See [documenation](channel.py) of the method 'optimize_fidelity' for more info.
+See [documentation](channel.py) of the method 'optimize_fidelity' for more info.
 
 
 Algorithm Information
@@ -187,8 +187,8 @@ If own wants to use their own parameterization this can be done by importing
 the abstract base class ParameterizationABC and implementing the three methods
 'numb_variables', 'bounds(nsize, rank)' and 'rho_from_vec(vec, nsize)'.
 
-Consider the following parameterization found in [paper [1]][1],   
-<p align="center"><img src="/PyQCodes/chan/tex/79ed363b4e45187d10b66cd7d8c587d9.svg?invert_in_darkmode&sanitize=true" align=middle width=286.29653745pt height=18.51100845pt/></p>
+Consider the following parameterization found in paper [^1],   
+<p align="center"><img src="/PyQCodes/chan/tex/b631d22704d952fc22566ec9d2b94a61.svg?invert_in_darkmode&sanitize=true" align=middle width=269.48330145pt height=18.51100845pt/></p>
 It has one real variables and the delta is bounded from 0 to 1. 
 
 ```python
@@ -225,7 +225,7 @@ doesn't work.
 Lipschitz
 ---------
 The coherent information is lipschitz with lipschitz constant 1. Using the 
-algorithm found in the [paper 2]][2]. 
+algorithm found in paper [^2]. 
 The lipschitz parameter will generate initial guesses based on the algorithm. 
 It will generate random density matirces and will save the random density 
 matrix if it satisfies the lipschitz condition to be used as an initial guess.
@@ -233,5 +233,6 @@ matrix if it satisfies the lipschitz condition to be used as an initial guess.
 
 References
 ==========
-[1] : Dephrasure channel and superadditivity of coherent information. By F.Leditzky, D. Leung and G. Smith.
-[2] : Global optimization of Lipschitz functions. By C. Malherbe and N. Vayatis.
+[^1]: Dephrasure channel and superadditivity of coherent information. By F.Leditzky, D. Leung and G. Smith.
+
+[^2]: Global optimization of Lipschitz functions. By C. Malherbe and N. Vayatis.
