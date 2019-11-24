@@ -14,7 +14,7 @@ Guide To Do
 * Stabilizer Codes.  See [file for more info](PyQCodes/README.md).
     - Find Logical Operators.
     - Apply Encoding, Measurement, and Decoding Circuit.
-* Optimization-Based Codes.  See [file for more info](PyQCodes/CODE_README.md).
+* Optimization-Based Codes.  See [file for more info](PyQCodes/README.md).
     - Optimizes the average fidelity over Recover/Encoding operators. Based on [^1]
     - Effective Channel Method of Stabilizer Codes. Based on [^2] and [^3].
 
@@ -24,15 +24,9 @@ Guide To Do
 
 Examples
 --------
-Consider the bit-flip channel <img src="/tex/60eeab20dca4be5e5498159d0777700c.svg?invert_in_darkmode&sanitize=true" align=middle width=128.22161384999998pt height=24.65753399999998pt/> acting on a density matrix <img src="/tex/6dec54c48a0438a5fcde6053bdb9d712.svg?invert_in_darkmode&sanitize=true" align=middle width=8.49888434999999pt height=14.15524440000002pt/>:
-
-$$
-\mathcal{N}(\rho) = (1 - p)\rho + p X \rho X.
-$$
-=======
 Consider the bit-flip channel <img src="/tex/586f67506b794b7f68f6667f872af766.svg?invert_in_darkmode&sanitize=true" align=middle width=152.34499169999998pt height=24.65753399999998pt/> acting on a density matrix <img src="/tex/6dec54c48a0438a5fcde6053bdb9d712.svg?invert_in_darkmode&sanitize=true" align=middle width=8.49888434999999pt height=14.15524440000002pt/>:
 <p align="center"><img src="/tex/783996e79c8a88c70f4d33384019d600.svg?invert_in_darkmode&sanitize=true" align=middle width=187.3080429pt height=16.438356pt/></p>
-
+    
 ```python
 import numpy as np
 from PyQCodes.chan.channel import AnalyticQChan
@@ -83,7 +77,7 @@ Then going to the PyQCode directory run
 Finally, it is recommended to run the tests to see if it installed correctly.
 
 ```bash
-    pytest -m "not slow -v
+    pytest -m "not slow" -v
 ```
 
 License
