@@ -281,11 +281,12 @@ def optimize_procedure(channel, n, rank, optimizer="diffev", param="overparam",
         if use_pool != 0:
            optimal_val, success, optimal_x_val = _use_multi_processes(samples, bounds, args,
                                                                       maxiter, eps, ftol,
-                                                                      objective_func, use_pool)
+                                                                      objective_func, use_pool,
+                                                                      disp)
         else:
            optimal_val, success, optimal_x_val = _optimize_samples_slsqp(samples, bounds, args,
                                                                          maxiter, eps, ftol,
-                                                                         objective_func)
+                                                                         objective_func, disp)
     else:
         raise TypeError("Optimizer should be 'diffev' or 'slsqp'.")
 

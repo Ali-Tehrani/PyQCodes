@@ -27,6 +27,7 @@ from projectq.meta import Control
 
 import numpy as np
 from scipy.sparse import kron, identity, csr_matrix
+import warnings
 from scipy.sparse.linalg import eigsh
 import itertools
 
@@ -656,54 +657,12 @@ class StabilizerCode():
         output = self.stab_bin_rep.copy()
 
         rank = np.linalg.matrix_rank(self.stab_bin_rep[:, :self.n])
-        print("The Rank  ", rank)
         numb_stabs = self.numb_stab
         assert self.stab_bin_rep.shape[0] == numb_stabs
 
-        # # Swap rows to ensure the diagonal elements are all ones.
-        # for j in range(0, rank):
-        #     print("j index ", j, output[j, j])
-        #     if output[j, j] == 0:
-        #         for i in range(j + 1, numb_stabs):
-        #             # Find a row below it to swap below it!
-        #             if output[i, j] == 1:
-        #                 copy = output[i, :].copy()
-        #                 output[i, :] = output[j, :]
-        #                 output[j, :] = copy
-        #                 break
-        #     print("shouldbe one now ", output[j, j])
-        # print(output)
-
         # Perform Gaussian elimination by going through each column up to rank.
         for j in range(0, rank):
-            print("jth index ", j)
-            # If diagonal element is zero.
-            # if output[j, j] == 0:
-            #     for i in range(j + 1, numb_stabs):
-            #         # Find a row below it to swap below it!
-            #         if output[i, j] == 1:
-            #             copy = output[i, :].copy()
-            #             output[i, :] = output[j, :]
-            #             output[j, :] = copy
-            #             break
-
-            # If the diagonal element is still zero. Try Swapping Columns.
-            # if output[j, j] == 0:
-            #     # Swap with a column!
-            #     for i_col in range(j + 1, self.n):
-            #         if output[j, i_col] == 1:
-            #             # Swap with respect to X component of G1 binary representation [G1 | G2]
-            #             copy = output[:, i_col].copy()
-            #             output[:, i_col] = output[:, j]
-            #             output[:, j] = copy
-            #
-            #             # Swap same part for G2
-            #             copy = output[:, i_col + self.n].copy()
-            #             output[:, i_col + self.n] = output[:, j + self.n]
-            #             output[:, j + self.n] = copy
-            #             break
-
-            # If it is still zero, Need to swap diagonal columns.
+            # If it is zero, Need to swap diagonal row or column.
             if output[j, j] == 0:
                 # Swap with a diagonal column!
                 did_not_swap = True
@@ -726,11 +685,17 @@ class StabilizerCode():
                             output[j_row, :] = copy
                             did_not_swap = False
 
+            # If it is still zero. Return a warning.
+            if output[j, j] == 0:
+                warnings.warn("Gaussian Elimination on Binary Representation Is Not Going to "
+                              "Work.  It could not find a row or column replacement to make sure "
+                              "diagonal element is one.")
+
             # Turn everything above and below the diagonal element to become zero.
             for i in range(0, numb_stabs):
                 if i != j and output[i, j] != 0:
                     output[i, :] = (output[j, :] + output[i, :]) % 2
-            #TODO: Add tests conditions and warnings here.
+
         return output, rank
 
     def _gaussian_elimination_second_block(self, binary_rep, rank):
@@ -757,6 +722,7 @@ class StabilizerCode():
         rank_E = np.linalg.matrix_rank(output[rank:, self.n + rank : ])
 
         # Swap rows to ensure the diagonal elements are all ones.
+        # TODO: Add More "Powerful" Swaps like in _gaussian_elimination_first_block
         for j in range(self.n + rank, self.n + rank + rank_E):
             if output[j - self.n, j] == 0:
 
@@ -787,6 +753,12 @@ class StabilizerCode():
                         output[:, i_col - self.n] = output[:, j - self.n]
                         output[:, j - self.n] = copy
                         break
+
+            # If it is still zero. Return a warning.
+            if diag_elem_E == 0:
+                warnings.warn("Gaussian Elimination on Binary Representation Is Not Going to "
+                              "Work.  It could not find a row or column replacement to make sure "
+                              "diagonal element is one.")
 
             # Turn everything above and below the diagonal element to become zero.
             for i in range(rank, self.n - self.k):  # Go through rows.
@@ -952,6 +924,10 @@ class StabilizerCode():
 
         n, k = stab1.n, stab1.k
         m, l = stab2.n, stab2.k
+
+        if n % l != 0:
+            assert ValueError("Code concatenation only works when l divides n, ie n | l.")
+
         generator = []
         # Suppose l = 1
         if l == 1:
@@ -993,6 +969,7 @@ class StabilizerCode():
                         new_gen_z += [0] * m
                 generator.append(new_gen_x + new_gen_z)
             return StabilizerCode(generator, n * m, k)
+
         if (n % l) == 0:
             # Divide
             numb_blocks = n // l

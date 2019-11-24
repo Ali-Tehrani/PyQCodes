@@ -15,6 +15,7 @@ class DeviceAdaptorABC(ABC):
 
     @abstractmethod
     def decomp_one_qubit_c_unitaries(self):
+        # Project Q already implements this, so it is probably not useful at all.
         pass
 
 
@@ -26,9 +27,6 @@ class ProjectQDeviceAdaptor(DeviceAdaptorABC):
         pass
 
     def estimate_average_fidelity(self):
-        pass
-
-    def decomp_one_qubit_c_unitaries(self):
         pass
 
     def parameterize_circuits(self):

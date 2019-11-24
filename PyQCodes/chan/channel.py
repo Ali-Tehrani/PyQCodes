@@ -648,13 +648,13 @@ class AnalyticQChan():
         self._update_channel_tensored(n)
         result = optimize_procedure(self, n=n, rank=rank, optimizer=optimizer, param=param,
                                     objective="coherent", lipschitz=lipschitz, use_pool=use_pool,
-                                    maxiter=maxiter, samples=samples)
+                                    maxiter=maxiter, samples=samples, disp=disp)
         if regularized:
             result["optimal_val"] /= float(n)
         return result
 
     def optimize_fidelity(self, n, optimizer="diffev", param="overparam", lipschitz=0,
-                          use_pool=False, maxiter=50, samples=()):
+                          use_pool=False, maxiter=50, samples=(), disp=False):
         r"""
         Optimizes the minimum fidelity of a channel over all pure states.
 
@@ -684,6 +684,8 @@ class AnalyticQChan():
         samples : list
             List of vectors that satisfy the parameterization from "param", that are served as
             initial guesses.
+        disp : bool
+            Print and display during the optimization procedure. Default is false.
 
         Returns
         -------
@@ -711,5 +713,5 @@ class AnalyticQChan():
         self._update_channel_tensored(n)
         result = optimize_procedure(self, n=n, rank=1, optimizer=optimizer, param=param,
                                     objective="fidelity", lipschitz=lipschitz, use_pool=use_pool,
-                                    maxiter=maxiter, samples=samples)
+                                    maxiter=maxiter, samples=samples, disp=disp)
         return result

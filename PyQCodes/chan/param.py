@@ -203,7 +203,7 @@ class OverParam(ParameterizationABC):
     numb_variables :
         Returns the number of variables to represent a hermitian, trace-one complex-matrix.
     bounds :
-        Return the range of variable, defualt is #TODO: Fill this out.
+        Return the range of variable, defualt is from -1 to 1.
     rho_from_vec(rank=None):
         Return hermitian, trace-one complex-matrix from real-variable vectors. If rank is none,
         then parameterization assumes full-rank matrix.
@@ -218,6 +218,7 @@ class OverParam(ParameterizationABC):
     A = np.array([[np.sqrt(0.5), 0], [0, np.sqrt(0.5)]])
     vec = OverParam.vec_from_rho(rho, nsize=2, rank=2)
     # vec should be [np.sqrt(0.5), 0, 0, 0, 0, 0, np.sqrt(0.5), 0]
+
     """
     def random_vectors(nsize, rank, dist="normal"):
         r"""

@@ -1,11 +1,4 @@
 import numpy as np
-from PyQCodes.chan._choi import ChoiQutip
-from scipy.sparse import coo_matrix, issparse, eye, kron, isspmatrix_coo
-
-# Semi-definite Solver
-import picos as pic
-import cvxopt as cvx
-
 
 r""" 
 Contains optimization routines for optimizing over density matrices 

@@ -1,9 +1,34 @@
+r"""
+The MIT License.
+
+Copyright (c) 2019-Present PyQCodes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"""
 import numpy as np
-from PyQCodes.find_codes import effective_channel_with_stabilizers, optimize_decoder_stabilizers
+import pytest
+from PyQCodes.find_codes import effective_channel_with_stabilizers
 
 
 def test_effective_channel_method_with_two_cat_code():
-    r"""Test effective channel method against shor's paper with two cat code.
+    r"""
+    Test effective channel method against shor's paper with two cat code.
 
     Shor's method showed for the cat-code and dephasing channel with probability
     of no error occuring as f.
@@ -17,8 +42,8 @@ def test_effective_channel_method_with_two_cat_code():
     n, k = 2, 1
     code_param = (n, k)
 
-    # Pauli Errors for Deplorizing Channel
-    for p in np.arange(0, 1., 0.01):
+    # Pauli Errors for Depolarizing Channel.
+    for p in [0., 0.1, 0.2, 0.5, 0.7, 0.8, 0.81, 0.811, 0.83, 0.85, 0.9, 0.95]:
         prob_no_error = p
         prob_error = (1. - prob_no_error) / 3.
 
@@ -29,8 +54,7 @@ def test_effective_channel_method_with_two_cat_code():
 
         kraus = [k1, k2, k3, k4]
 
-        result = effective_channel_with_stabilizers(bin_rep, code_param, kraus, opti="coherent")
-
+        result = effective_channel_with_stabilizers(bin_rep, code_param, kraus, optimize="coherent")
         if p <= 0.8113:
             assert result["optimal_val"] <= 1e-8
         else:
@@ -116,38 +140,9 @@ def test_effective_channel_method_with_four_cat_code():
             assert result["optimal_val"] > 1e-8
 
 
-def test_optimization_average_fidelity_on_identtiy_channel():
-    r"""Test optimizing decoder on the identity channel."""
-
-    # Five qubit code
-    stab_code = ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"]
-    n = 5
-    k = 1
-    bin_rep = np.array([[1, 0, 0, 1, 0, 0, 1, 1, 0, 0],
-                        [0, 1, 0, 0, 1, 0, 0, 1, 1, 0],
-                        [1, 0, 1, 0, 0, 0, 0, 0, 1, 1],
-                        [0, 1, 0, 1, 0, 1, 0, 0, 0, 1]])
-
-
-    #  Identity hannel on a single qubit.
-    # kraus = [np.eye(2) / 2.]
-    #
-    # result = optimize_decoder_stabilizers(bin_rep, (n, k), kraus, sparse=True)
-    # desired = 1
-    # # TODO: Add assertion of result here.
-
-    # Test on random unitary operator.
-    L = np.random.normal(0., 1., size=(2, 2))
-    mat = L.dot(L.conj().T)
-    _, unitary = np.linalg.eigh(mat)
-    assert np.all(np.abs(unitary.conj().T - np.linalg.inv(unitary)) < 1e-5)
-    kraus = [unitary]
-    result = optimize_decoder_stabilizers(bin_rep, (n, k), kraus, sparse=True)
-    desired = 1
-
-
 if __name__ == "__main__":
-    test_optimization_average_fidelity_on_identtiy_channel()
+    test_effective_channel_method_with_two_cat_code()
+    pass
     # test_effective_channel_method_with_two_cat_code()
     # test_effective_channel_method_with_three_cat_code()
     # test_effective_channel_method_with_four_cat_code()

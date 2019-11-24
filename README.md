@@ -4,8 +4,8 @@ PyQCodes
 
 PyQCodes provides a set of functions to investigate coherent information, minimum fidelity, certain optimization-based codes and stabilizer codes.
 
-Guide To Do
------------
+Guide
+-----
 * Quantum Channels. See [file for more info](PyQCodes/chan/README.md).
     - Compute Channel, Adjoint of Channel.
     - Compute Complementary Channel and Adjoint of Complementary Channel.

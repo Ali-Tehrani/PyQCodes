@@ -22,8 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 import numpy as np
-import cvxopt as cvx
-import picos as pic
 from numpy.testing import assert_raises
 from qutip import rand_dm_ginibre
 
@@ -31,6 +29,7 @@ from PyQCodes.chan._choi import ChoiQutip
 from PyQCodes.chan._kraus import DenseKraus
 
 r"""Test file for PyQCodes._choi.py."""
+
 
 def set_up_dephrasure_conditions(p, q):
     # Set up the dephrasure channel for the tests bellow.
@@ -74,37 +73,6 @@ def check_two_sets_of_krauss_are_same(krauss1, krauss2, numb_qubits, dim_in, dim
             is_same = False
             break
     return is_same
-
-
-def test_creation_of_one_qubit_operators():
-    # Depolarizing Channel
-    px = 0.1
-    lams = np.array([1. - 4. * px, 1. - 4. * px, 1. - 4. * px])
-
-    identity = np.eye(2) * np.sqrt(1 - 3. * px)
-    X = np.array([[0., 1.], [1., 0.]]) * np.sqrt(px)
-    Y = np.array([[0., complex(0, -1.)], [complex(0, 1.), 0.]]) * np.sqrt(px)
-    Z = np.array([[1., 0.], [0., -1.]]) * np.sqrt(px)
-
-    # Check with lamda parameters
-    channel = ChoiQutip.one_qubit_choi_matrix(lams, np.array([0., 0., 0.]), pauli_errors=False)
-
-    # Check Equivalence to deplorizing channel over random set.
-    assert check_two_sets_of_krauss_are_same([identity, X, Y, Z],
-                                             channel.kraus_operators(), [1, 1], 2, 2)
-
-    # Check with Pauli-Errors
-    pauli_errors = np.array([px, px, px])
-    channel = ChoiQutip.one_qubit_choi_matrix(pauli_errors, np.array([0., 0., 0.]),
-                                              pauli_errors=True)
-
-    # Check Trace-perserving
-    cond = sum([np.conj(x.T).dot(x) for x in channel.kraus_operators()])
-    assert np.all(np.abs(cond - np.eye(2)) < 1e-5)
-
-    # Check Equivalence to deplorizing channel over random set.
-    assert check_two_sets_of_krauss_are_same([identity, X, Y, Z],
-                                             channel.kraus_operators(), [1, 1], 2, 2)
 
 
 def test_creation_from_choi_operator():
@@ -215,59 +183,8 @@ def test_avg_entanglement_fidelity_ensemble():
     desired += np.ravel(states[1], "F").dot(choi_matrix.dot(np.ravel(states[1], "F"))) * probs[1]
     assert np.abs(actual - desired) < 1e-5
 
+    kraus = [np.array([[0., 1.], [1., 0.]])]
 
-def test_picos_constraints_for_trace_perserving():
-    r"""Test the constraints 'constraint_partial_trace' match picos functionality."""
-    # Test over Pauli Chanmel
-    for p in np.arange(0., 1., 0.1):
-        for p2 in np.arange(0., 1., 0.1):
-            kraus = initialize_pauli_examples(p, p2, p)
 
-            # Construct choi matrix from krauss operators
-            choi_matrix = sum([np.outer(np.ravel(x, order="F"),
-                                        np.conj(np.ravel(x, order="F"))) for x in kraus])
-
-            # Number of input and output qubits, respectively.
-            k, n = 1, 1
-            numb_rows = 2 ** (n + k)
-            numb_cols = 2 ** (n + k)
-            assert choi_matrix.size == numb_rows * numb_cols
-
-            mat = cvx.matrix(choi_matrix)
-            dims = [(2 ** k, 2 ** k), (2 ** n, 2 ** n)]
-            P = pic.Problem()
-            X = P.add_variable('X', (4, 4))
-            X.value = mat
-
-            # Test partial trace is equivalent to identity.
-            args = ChoiQutip.constraint_partial_trace(numb_qubits=[1, 1], dim_in=2, dim_out=2)
-            desired = pic.partial_trace(X, *args)
-            actual = np.eye(dims[0][0])
-            assert np.all(np.abs(desired - actual))
-
-    # Test over dephrasure channel.
-    for p in np.arange(0, 1, 0.1):
-        for p2 in np.arange(0, 1, 0.1):
-            kraus = set_up_dephrasure_conditions(p, p2)
-
-            # Construct choi matrix from krauss operators
-            choi_matrix = sum([np.outer(np.ravel(x, order="F"),
-                                        np.conj(np.ravel(x, order="F"))) for x in kraus])
-
-            # Number of input and output qubits, respectively.
-            k, n = 1, 1
-            numb_rows = 2 ** (n + k)
-            numb_cols = 3 ** (n + k)
-            assert choi_matrix.size == numb_rows * numb_cols
-
-            mat = cvx.matrix(choi_matrix)
-            dims = [(2 ** k, 2 ** k), (3 ** n, 3 ** n)]
-            P = pic.Problem()
-            X = P.add_variable('X', (2**k * 3**n, 2**k * 3**n))
-            X.value = mat
-
-            # Test partial trace is equivalent to identity.
-            args = ChoiQutip.constraint_partial_trace(numb_qubits=[1, 1], dim_in=2, dim_out=3)
-            desired = pic.partial_trace(X, *args)
-            actual = np.eye(dims[0][0])
-            assert np.all(np.abs(desired - actual))
+if __name__ == "__main__":
+    pass
