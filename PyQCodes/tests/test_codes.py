@@ -27,7 +27,7 @@ from numpy.testing import assert_raises
 import itertools
 
 from projectq import MainEngine
-from projectq.ops import H, XGate, YGate, ZGate, HGate, All, Measure
+from projectq.ops import XGate, YGate, ZGate, HGate, All, Measure, QubitOperator
 from projectq.meta import Control
 from PyQCodes.codes import StabilizerCode
 
@@ -451,7 +451,7 @@ def test_matrix_blocks_standard_form():
     assert np.all(np.abs(actual_c2 - c2) < 1e-5)
 
 
-def test_logical_operators():
+def test_logical_operators_from_standard_normal_form():
     r"""Test obtaining the logical operators from the standard normal form."""
     # Test on [5, 1] Code, from Gaitan book (pg 120)
     n, k = 5, 1
@@ -497,277 +497,6 @@ def test_logical_operators():
                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1]])
     assert np.all(np.abs(desired_X - actual_X) < 1e-5)
     assert np.all(np.abs(desired_Z - actual_Z) < 1e-5)
-
-
-def encoding_circuit_containment(code, n, k):
-    r"""This is a helper function on checking if the encoding circuit maps the right code-words
-    to the right code-words."""
-    basis = code.encode_krauss_operators()
-
-    # Get all computational basis.
-    lst = list(itertools.product([0, 1], repeat=n))
-
-    # Test on the |0..0> k-qubit un-encoded maps to the right-code space.
-    initial_tries = [[0] * k, [1] * k]
-    if k != 1: # Add extra one that is non-trivial.
-        not_found = True
-        while not_found :
-            guess = np.random.randint(0, 2, size=(k,))
-            if not any((guess[:] == initial_tries).all(1)):
-                initial_tries += [guess]
-                not_found = False
-
-    # Start testing on specific encoding on start-vectors.
-    for start in initial_tries:
-        already_done = []
-        print("start", start)
-        for numb_tries in range(0, 200):
-            # Create engine, create register, apply encoding circuit and measure it.
-            from projectq.setups import linear
-            engine_list2 = linear.get_engine_list(num_qubits=5, cyclic=False,
-                                                  one_qubit_gates="any",
-                                                  two_qubit_gates="any")
-            eng = projectq.MainEngine(engine_list=engine_list2)
-
-            register = eng.allocate_qureg(n)
-            eng.flush()
-            code.encoding_circuit(eng, register, start)
-
-            All(Measure) | register
-            eng.flush()
-            result = tuple([int(x) for x in register])
-
-            if numb_tries == 0:
-                # Find the right-column space.
-                for j in range(0, 2 ** k):
-                    basis1 = np.array(lst)[basis[:, j] != 0]
-                    if any((basis1[:] == list(result)).all(1)) and j not in already_done:
-                        already_done.append(j)
-                        break
-                else:
-                    # If the loop finishes properly, then the test failed.
-                    raise ValueError("Test failed, couldn't find encoded basis in the code-space.")
-            assert any((basis1[:] == list(result)).all(1))
-
-
-def test_encoding_circuit_5_1_code_containment():
-    r"""Test the encoding circuit on the [5,1] code that it maps to the right code-space."""
-    n, k = 5, 1
-    binary_rep = np.array([[1, 0, 0, 1, 0, 0, 1, 1, 0, 0],
-                           [0, 1, 0, 0, 1, 0, 0, 1, 1, 0],
-                           [1, 0, 1, 0, 0, 0, 0, 0, 1, 1],
-                           [0, 1, 0, 1, 0, 1, 0, 0, 0, 1]])
-    code = StabilizerCode(binary_rep, n, k)
-
-    encoding_circuit_containment(code, n, k)
-
-
-def test_encoding_circuit_4_2_code_containment():
-    r"""Test the encoding cirucit on [4, 2] code that it maps to the right code-space."""
-    n, k = 4, 2
-    binary_rep = np.array([[1, 0, 0, 1, 0, 1, 1, 0],
-                           [1, 1, 1, 1, 1, 0, 0, 1]])
-    code = StabilizerCode(binary_rep, n, k)
-    encoding_circuit_containment(code, n, k)
-
-
-def test_encoding_circuit_on_dephasing_containment():
-    r"""Test the probabilies of the dephasing error code has the right probabilities."""
-    n, k = 3, 1
-    binary_rep = np.array([[1, 1, 0, 0, 0, 0], [1, 0, 1, 0, 0, 0]])
-    code = StabilizerCode(binary_rep, 3, 1)
-
-    # Create engine, create register, apply encoding circuit and measure it.
-    eng = projectq.MainEngine()
-    register = eng.allocate_qureg(n)
-    code.encoding_circuit(eng, register, [1])
-
-    # Check on |001>, |010>, |100>, |111>
-    eng.flush()
-    prob1 = eng.backend.get_probability("001", register)
-    prob2 = eng.backend.get_probability("010", register)
-    prob3 = eng.backend.get_probability("100", register)
-    prob4 = eng.backend.get_probability("111", register)
-    assert np.all(np.abs(np.array([prob1, prob2, prob3, prob4]) - np.array([0.25] * 4)) < 1e-4)
-    eng.flush()
-    All(Measure) | register
-
-    # Check on |000>, |011>, |101>, |110>
-    eng = projectq.MainEngine()
-    register = eng.allocate_qureg(n)
-    code.encoding_circuit(eng, register, [0])
-    eng.flush()
-    prob1 = eng.backend.get_probability("000", register)
-    prob2 = eng.backend.get_probability("011", register)
-    prob3 = eng.backend.get_probability("101", register)
-    prob4 = eng.backend.get_probability("110", register)
-    assert np.all(np.abs(np.array([prob1, prob2, prob3, prob4]) - np.array([0.25] * 4)) < 1e-4)
-    eng.flush()
-    All(Measure) | register
-
-
-def test_encoding_circuit_on_shor_code_containment():
-    r"""FIXME: THIS DOESN"T WORK."""
-    n, k = 9, 1
-    binary_rep = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0,   1, 1, 0, 0, 0, 0, 0, 0, 0],
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0,   1, 0, 1, 0, 0, 0, 0, 0, 0],
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 1, 1, 0, 0, 0, 0],
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 1, 0, 1, 0, 0, 0],
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 1, 1, 0],
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 1, 0, 1],
-                           [1, 1, 1, 1, 1, 1, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, 0],
-                           [1, 1, 1, 0, 0, 0, 1, 1, 1,   0, 0, 0, 0, 0, 0, 0, 0, 0]])
-    code = StabilizerCode(binary_rep, 9, 1)
-    basis = code.encode_krauss_operators()
-
-    all_basis = list(itertools.product([0, 1], repeat=n))
-
-    # print(basis[:, 0])
-    print(code.normal_form)
-    basis_sets = ["000000000", "000000111", "000111000", "000111111",
-                  "111000000", "111000111", "111111000", "111111111"]
-    prob_amplitude = [1. / (2. * np.sqrt(2))]
-    for i, x in enumerate(basis[:, 0]):
-        eng = projectq.MainEngine()
-
-        register = eng.allocate_qureg(n)
-        eng.flush()
-        code.encoding_circuit(eng, register, [0])
-        eng.flush()
-        ordering, amplitudes = eng.backend.cheat()
-        print(ordering)
-        print(amplitudes)
-
-
-        All(Measure) | register
-        measured = [int(x) for x in register]
-        measured_str = "".join(str(k) for k in measured)
-        eng.flush(deallocate_qubits=True)
-        print(measured_str)
-        print(basis[:, 0] - amplitudes)
-        assert measured_str in basis_sets
-
-        # # Get basis element
-        # basis_element = all_basis[i]
-        # string_basis = "".join(str(k) for k in basis_element)
-        # eng.flush()
-        # prob = eng.backend.get_amplitude(string_basis, register)
-
-
-def test_encoding_circuit_8_3_code_containment():
-    r"""Test the encoding circuit on the [8, 3] code that it maps to the right code-space.
-
-    FIXME: This doesn't work.
-    """
-    n, k = 8, 3
-    binary_rep = np.array([[1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-                           [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
-                           [0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1],
-                           [0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1],
-                           [0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]])
-    code = StabilizerCode(binary_rep, n, k)
-    encoding_circuit_containment(code, n, k)
-
-    # Test assertion is raised if state doesn't match k.
-    eng = projectq.MainEngine()
-    register = eng.allocate_qureg(8)
-    assert_raises(AssertionError, code.encoding_circuit, eng, register, [0])
-
-
-def test_8_3_code_from_book():
-    r"""Test the 8_3 code straight from the book.
-
-    FIXME: This doesn't work.
-    """
-
-    def apply_code_from_book(eng, register):
-        HGate() | register[0]
-        with Control(eng, register[0]):
-            # QubitOperator('Y4', -1.j) | register
-            # QubitOperator('Y5', -1.j) | register
-            YGate() | register[4]
-            YGate() | register[5]
-            XGate() | register[6]
-            ZGate() | register[7]
-
-        HGate() | register[1]
-        with Control(eng, register[1]):
-            # QubitOperator('Y4', -1.j) | register
-            YGate() | register[4]
-            XGate() | register[5]
-            ZGate() | register[6]
-            # QubitOperator('Y7', -1.j) | register
-            YGate() | register[7]
-
-        HGate() | register[2]
-        with Control(eng, register[2]):
-            ZGate() | register[1]
-            # QubitOperator('Y4', -1.j) | register
-            # QubitOperator('Y6', -1.j) | register
-            YGate() | register[4]
-            YGate() | register[6]
-            XGate() | register[7]
-
-        HGate() | register[3]
-        with Control(eng, register[3]):
-            ZGate() | register[2]
-            ZGate() | register[4]
-            # QubitOperator('Y5', -1.j) | register
-            YGate() | register[5]
-            XGate() | register[6]
-            XGate() | register[7]
-
-    n, k = 8, 3
-    binary_rep = np.array([[1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-                           [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
-                           [0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1],
-                           [0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1],
-                           [0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]])
-    code = StabilizerCode(binary_rep, n, k)
-    basis = code.encode_krauss_operators()
-
-    # Get all computational basis.
-    n, k = 8, 3
-    lst = list(itertools.product([0, 1], repeat=n))
-
-    # Start testing on specific encoding on start-vectors.
-    already_done = []
-    for numb_tries in range(0, 200):
-        # Create engine, create register, apply encoding circuit and measure it.
-        eng = projectq.MainEngine()
-        register = eng.allocate_qureg(n)
-        eng.flush()
-        ordering, amplitudes = eng.backend.cheat()
-        print("pre", ordering)
-        apply_code_from_book(eng, register)
-        eng.flush()
-        ordering, amplitudes = eng.backend.cheat()
-        print(ordering)
-        print(amplitudes)
-        All(Measure) | register
-        print("prob ", eng.backend.get_amplitude("11010100", register))
-        ordering, amplitudes = eng.backend.cheat()
-        print(ordering)
-        eng.flush()
-        result = tuple([int(x) for x in register])
-        print("measred ", "".join([str(x) for x in result]))
-
-        del register
-        if numb_tries == 0:
-            # Find the right-column space.
-            for j in range(0, 2 ** k):
-                basis1 = np.array(lst)[basis[:, j] != 0]
-                if any((basis1[:] == list(result)).all(1)) and j not in already_done:
-                    already_done.append(j)
-                    break
-            else:
-                # If the loop finishes properly, then the test failed.
-                raise ValueError("Test failed, couldn't find encoded basis in the code-space.")
-        print("j ", j)
-        print(result)
-        print((basis1[:] == list(result)).all(1))
-        print(basis1)
-        assert any((basis1[:] == list(result)).all(1))
 
 
 def test_probabilities_of_encoding_circuit_against_encoding_operator_4_2_code():
@@ -1135,15 +864,19 @@ def test_syndrome_measurement_circuit_on_4_2_code():
     for i in range(0, 100):
         eng = MainEngine()
         quantum_reg = eng.allocate_qureg(4)
+        eng.flush()
+
         random_state = [i % 2, (i + np.random.random_integers(0, 3)) % 2]
         code.encoding_circuit(eng, quantum_reg, state=random_state)
-
+        print(eng.backend.cheat()[1])
         if i % 2 == 0:
             measure_result = code.single_syndrome_measurement(eng, quantum_reg, "XZZX")
         else:
             measure_result = code.single_syndrome_measurement(eng, quantum_reg, "YXXY")
+        print(eng.backend.cheat()[1])
         All(Measure) | quantum_reg
         eng.flush()
+        print(measure_result)
         assert measure_result == 0
 
         # Try applying a random logical circuit which should still be in the code-space.
@@ -1153,22 +886,378 @@ def test_syndrome_measurement_circuit_on_4_2_code():
         random_logical = np.random.choice(["X0", "Z0", "Y0", "X1", "Z1", "Y1"])
         code.logical_circuit(eng, quantum_reg[:4], random_logical)
         if i % 2 == 0:
-            measure_result = code.single_syndrome_measurement(eng, quantum_reg, binary[0])
+            measure_result = code.single_syndrome_measurement(eng, quantum_reg, code.normal_form[0])
         else:
-            # Try other stabilizer.
-            measure_result = code.single_syndrome_measurement(eng, quantum_reg, binary[1])
+            # Try other stabilizer too .
+            measure_result = code.single_syndrome_measurement(eng, quantum_reg, code.normal_form[1])
         All(Measure) | quantum_reg
         eng.flush()
         assert measure_result == 0
+
+        # Test applying an error operator that anti-commutes.
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(4)
+        eng.flush()
+        code.encoding_circuit(eng, quantum_reg[:4], state=random_state)
+        YGate() | quantum_reg[1]
+        measure_result = code.single_syndrome_measurement(eng, quantum_reg, binary[0])
+        All(Measure) | quantum_reg
+        eng.flush()
+        assert measure_result == 1, "Error should anticommute."
+
+        # Test applying an error operator that anti-commutes but measure with normal form instead.
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(4)
+        eng.flush()
+        code.encoding_circuit(eng, quantum_reg[:4], state=random_state)
+        YGate() | quantum_reg[1]
+        measure_result = code.single_syndrome_measurement(eng, quantum_reg, code.normal_form[0])
+        All(Measure) | quantum_reg
+        eng.flush()
+        assert measure_result == 1, "Error should anticommute."
 
     eng = MainEngine()
     quantum_reg = eng.allocate_qureg(6)
     assert_raises(TypeError, code.single_syndrome_measurement, eng, quantum_reg, binary[0])
 
 
+def test_applying_circuit_stabilizers_on_bitflip_code():
+    r"""Test applying the stabilizers correctly.
+
+    This tests assumes encoding circuit is working correctly.
+    """
+    code = ["ZZI", "ZIZ"]
+    binary = np.array([[0, 0, 0, 1, 1, 0], [0, 0, 0, 1, 0, 1]])
+    stabilizer = StabilizerCode(code, 3, 1)
+
+    # Apply it 10 times with different states.
+    for j in range(0, 10):
+        for i in range(0, 2):  # Go through each Stabilizer.
+            eng = MainEngine()
+            quantum_reg = eng.allocate_qureg(3)
+            stabilizer.encoding_circuit(eng, quantum_reg, state=[j % 2])  # Try both states.
+
+            # Cheat and make sure the results are all the same
+            eng.flush()
+            result1 = np.array(eng.backend.cheat()[1])
+            stabilizer.apply_stabilizer_circuit(eng, quantum_reg, binary[i])
+            result2 = np.array(eng.backend.cheat()[1])
+            assert np.all(np.abs(result1 - result2) < 1e-3)
+
+            register = stabilizer.decoding_circuit(eng, quantum_reg, add_ancilla_bits=True,
+                                                  deallocate_nqubits=True)
+            All(Measure) | register
+            assert int(register[-1]) == j % 2
+
+
+def test_applying_stabilizer_circuit_on_4_2_code():
+    n, k = 4, 2
+    binary = np.array([[1, 0, 0, 1, 0, 1, 1, 0],
+                       [1, 1, 1, 1, 1, 0, 0, 1]])
+    stabilizer = StabilizerCode(binary, n, k)
+    for j in range(0, 20):
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(4)
+        random_state = [j % 2, (j + np.random.randint(1, 4)) % 2]
+        stabilizer.encoding_circuit(eng, quantum_reg, state=random_state)
+
+        result1 = np.array(eng.backend.cheat()[1])
+        # Apply stabilizer which should affected the result.
+        stabilizer.apply_stabilizer_circuit(eng, quantum_reg, binary[0])
+        stabilizer.apply_stabilizer_circuit(eng, quantum_reg, binary[1])
+        result2 = np.array(eng.backend.cheat()[1])
+        assert np.all(np.abs(result2 - result1) < 1e-4)
+
+        register = stabilizer.decoding_circuit(eng, quantum_reg, add_ancilla_bits=True)
+        All(Measure) | register
+        assert int(register[-1]) == random_state[-1]
+        assert int(register[-2]) == random_state[-2]
+
+
+def test_applying_stabilizer_circuit_on_random_code():
+    code = ["ZYI", "ZIY"]
+    binary = np.array([[0, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1]])
+    stabilizer = StabilizerCode(binary, 3, 1)
+
+    for j in range(0, 20):
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(3)
+        eng.flush()
+
+        # Apply stabilizer.
+        stabilizer.encoding_circuit(eng, quantum_reg, state=[0])
+        eng.flush()
+
+        result1 = np.array(eng.backend.cheat()[1])
+        stabilizer.apply_stabilizer_circuit(eng, quantum_reg, stabilizer.normal_form[0])
+        stabilizer.apply_stabilizer_circuit(eng, quantum_reg, stabilizer.normal_form[1])
+        result2 = np.array(eng.backend.cheat()[1])
+
+        register = stabilizer.decoding_circuit(eng, quantum_reg, add_ancilla_bits=True)
+        All(Measure) | register
+        assert int(register[-1]) == 0
+
+
+def test_encoding_circuit_4_2_maps_to_plus_one_eigenspace():
+    r"""Test the encoding cirucit on [4, 2] code that it maps to the right code-space."""
+    n, k = 4, 2
+    binary_rep = np.array([[1, 0, 0, 1, 0, 1, 1, 0],
+                           [1, 1, 1, 1, 1, 0, 0, 1]])
+    code = StabilizerCode(binary_rep, n, k)
+
+    for state in [[0, 0], [0, 1], [1, 0], [1, 1]]:
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(4)
+        code.encoding_circuit(eng, quantum_reg, state=state)
+        eng.flush()
+        wave_function = eng.backend.cheat()[1]
+        All(Measure) | quantum_reg
+
+        # Get stabilizer in matrix format.
+        stabilizers = StabilizerCode.binary_rep_to_pauli_mat(binary_rep)
+
+        for stab in stabilizers:
+            assert np.all(np.abs(wave_function - stab.dot(wave_function)) < 1e-3)
+
+
+def test_encoding_circuit_bit_flip_maps_to_plus_one_eigenspace():
+    binary_rep = np.array([[0, 0, 0, 1, 1, 0], [0, 0, 0, 1, 0, 1]])
+    stabilizer = StabilizerCode(binary_rep, 3, 1)
+
+    for state in [[0], [1]]:
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(3)
+        stabilizer.encoding_circuit(eng, quantum_reg, state=state)
+        eng.flush()
+        wave_function = eng.backend.cheat()[1]
+        All(Measure) | quantum_reg
+
+        # Get stabilizer in matrix format.
+        stabilizers = StabilizerCode.binary_rep_to_pauli_mat(binary_rep)
+
+        for stab in stabilizers:
+            assert np.all(np.abs(wave_function - stab.dot(wave_function)) < 1e-3)
+
+
+def test_encoding_circuit_shor_maps_to_plus_one_eigenspace():
+    r"""Test that the encoding ciruict for shor is in the plus one eigenspace."""
+    binary_rep = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+                           [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                           [1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
+    code = StabilizerCode(binary_rep, 9, 1)
+
+    for state in [[0], [1]]:
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(9)
+
+        code.encoding_circuit(eng, quantum_reg, state=state)
+        eng.flush()
+        wave_function = eng.backend.cheat()[1]
+        All(Measure) | quantum_reg
+
+        # Get stabilizer in matrix format.
+        stabilizers = StabilizerCode.binary_rep_to_pauli_mat(binary_rep)
+        for stab in stabilizers:
+            # Check that the wavefunction is in the plus one eigenspace of each stabilizer.
+            assert np.all(np.abs(wave_function - stab.dot(wave_function)) < 1e-3)
+
+
+def test_encoding_circuit_on_5_1_maps_to_plus_one_eigenspace():
+    binary_rep = np.array([[1, 0, 0, 1, 0, 0, 1, 1, 0, 0],
+                           [0, 1, 0, 0, 1, 0, 0, 1, 1, 0],
+                           [1, 0, 1, 0, 0, 0, 0, 0, 1, 1],
+                           [0, 1, 0, 1, 0, 1, 0, 0, 0, 1]])
+    n, k = 5, 1
+    code = StabilizerCode(binary_rep, n, k)
+
+    for state in [[0], [1]]:
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(n)
+        eng.flush()
+        code.encoding_circuit(eng, quantum_reg, state=state)
+        eng.flush()
+        wave_function = eng.backend.cheat()[1]
+        All(Measure) | quantum_reg
+
+        # Get stabilizer in matrix format.
+        stabilizers = StabilizerCode.binary_rep_to_pauli_mat(binary_rep)
+        for stab in stabilizers:
+            # Check that the wavefunction is in the plus one eigenspace of each stabilizer.
+            assert np.all(np.abs(wave_function - stab.dot(wave_function)) < 1e-3)
+
+
+def test_encoding_circuit_5_1_is_the_same_from_book():
+    r"""Test the encoding circuit on the [5, 1] code is the same as the book."""
+    n, k = 5, 1
+    binary_rep = np.array([[1, 0, 0, 1, 0, 0, 1, 1, 0, 0],
+                           [0, 1, 0, 0, 1, 0, 0, 1, 1, 0],
+                           [1, 0, 1, 0, 0, 0, 0, 0, 1, 1],
+                           [0, 1, 0, 1, 0, 1, 0, 0, 0, 1]])
+    code = StabilizerCode(binary_rep, n, k)
+
+    def circuit_from_the_book(eng, reg):
+        HGate() | reg[0]
+        with Control(eng, reg[0]):
+            QubitOperator('Y4', 1.j) | reg
+
+        HGate() | reg[1]
+        with Control(eng, reg[1]):
+            XGate() | reg[4]
+
+        HGate() | reg[2]
+        with Control(eng, reg[2]):
+            ZGate() | reg[0]
+            ZGate() | reg[1]
+            XGate() | reg[4]
+
+        HGate() | reg[3]
+        with Control(eng, reg[3]):
+            ZGate() | reg[0]
+            ZGate() | reg[2]
+            QubitOperator('Y4', 1.j) | reg
+
+    for state in [[0], [1]]:
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(n)
+        eng.flush()
+        code.encoding_circuit(eng, quantum_reg, state=state)
+        eng.flush()
+
+        wave_function_code = np.array(eng.backend.cheat()[1])
+        All(Measure) | quantum_reg
+
+        # From the book.
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(n)
+        eng.flush()
+        if state[0] == 1:
+            XGate() | quantum_reg[-1]
+        circuit_from_the_book(eng, quantum_reg)
+        eng.flush()
+
+        wave_function_book = np.array(eng.backend.cheat()[1])
+        All(Measure) | quantum_reg
+        assert np.all(np.abs(wave_function_book - wave_function_code) < 1e-4)
+
+
+def circuit_from_the_book(eng, register):
+    eng.flush()
+    HGate() | register[0]
+    with Control(eng, register[0]):
+        QubitOperator('Y4', 1.j) | register
+        QubitOperator('Y5', 1.j) | register
+        # YGate() | register[4]
+        # YGate() | register[5]
+        XGate() | register[6]
+        ZGate() | register[7]
+    HGate() | register[1]
+    with Control(eng, register[1]):
+        QubitOperator('Y4', 1.j) | register
+        # YGate() | register[4]
+        XGate() | register[5]
+        ZGate() | register[6]
+        QubitOperator('Y7', 1.j) | register
+        # YGate() | register[7]
+    HGate() | register[2]
+    with Control(eng, register[2]):
+        ZGate() | register[1]
+        QubitOperator('Y4', 1.j) | register
+        QubitOperator('Y6', 1.j) | register
+        # YGate() | register[4]
+        # YGate() | register[6]
+        XGate() | register[7]
+    HGate() | register[3]
+    with Control(eng, register[3]):
+        ZGate() | register[2]
+        ZGate() | register[4]
+        QubitOperator('Y5', 1.j) | register
+        # YGate() | register[5]
+        XGate() | register[6]
+        XGate() | register[7]
+
+
+def test_encoding_circuit_8_3_maps_to_plus_one_eigenspace():
+    n, k = 8, 3
+    binary_rep = np.array([
+                           [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
+                           [0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                           [0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                           [0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],])
+    code = StabilizerCode(binary_rep, n, k)
+
+    for state in [[0, 0, 0]]:
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(n)
+        eng.flush()
+        code.encoding_circuit(eng, quantum_reg, state=state)
+        wave_function = eng.backend.cheat()[1]
+        All(Measure) | quantum_reg
+
+        # Get stabilizer in matrix format.
+        stabilizers = StabilizerCode.binary_rep_to_pauli_mat(binary_rep)
+        for i, stab in enumerate(stabilizers):
+            print(StabilizerCode.binary_rep_to_pauli_str(binary_rep[i]))
+            # print(wave_function + stab.dot(wave_function))
+            # Check that the wavefunction is in the plus one eigenspace of each stabilizer.
+            assert np.all(np.abs(wave_function - stab.dot(wave_function)) < 1e-3)
+
+
+def test_encoding_circuit_8_3_is_the_same_from_book():
+    r"""Test the 8_3 circuit is the same as the book."""
+    n, k = 8, 3
+    binary_rep = np.array([[1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
+                           [0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                           [0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                           [0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]])
+    code = StabilizerCode(binary_rep, n, k)
+    code.normal_form = np.array([[1, 0, 0, 0, 1, 1, 1, 0,   0, 1, 0, 0, 1, 1, 0, 1],
+                                 [0, 1, 0, 0, 1, 1, 0, 1,   0, 0, 1, 0, 1, 0, 1, 1],
+                                 [0, 0, 1, 0, 1, 0, 1, 1,   0, 1, 0, 1, 1, 0, 1, 0],
+                                 [0, 0, 0, 1, 0, 1, 1, 1,   0, 0, 1, 1, 1, 1, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0, 0,   1, 1, 1, 1, 1, 1, 1, 1]])
+    for state in [[0, 0, 0]]:
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(n)
+        eng.flush()
+        code.encoding_circuit(eng, quantum_reg, state=state)
+        wave_function_code = np.array(eng.backend.cheat()[1])
+        All(Measure) | quantum_reg
+
+        # From the book.
+        eng = MainEngine()
+        quantum_reg = eng.allocate_qureg(n)
+        eng.flush()
+        circuit_from_the_book(eng, quantum_reg)
+        eng.flush()
+
+        wave_function_book = np.array(eng.backend.cheat()[1])
+        All(Measure) | quantum_reg
+        assert np.all(np.abs(wave_function_book - wave_function_code) < 1e-4)
+
+
 if __name__ == "__main__":
+    # test_applying_stabilizer_circuit_on_random_code()
+    # test_encoding_circuit_8_3_maps_to_plus_one_eigenspace()
+
+    # test_encoding_circuit_shor_maps_to_plus_one_eigenspace()
+    # test_encoding_circuit_8_3_is_the_same_from_book()
+    # test_encoding_circuit_on_5_1_maps_to_plus_one_eigenspace()
+    # test_encoding_circuit_5_1_is_the_same_from_book()
+    # test_encoding_circuit_bit_flip_maps_to_plus_one_eigenspace()
+    # test_encoding_circuit_4_2_maps_to_plus_one_eigenspace()
+
+    # test_applying_stabilizer_circuit_on_random_code()
+    # test_applying_stabilizer_circuit_on_4_2_code()
+    # test_applying_circuit_stabilizers_on_bitflip_code()
     # test_decoding_circuit_with_encoding_circuit_perserves_state_4_2_code()
-    # test_syndrome_measurement_circuit_on_4_2_code()
+    test_syndrome_measurement_circuit_on_4_2_code()
     # test_syndrome_measurement_circuit_on_phase_flip_code()
     # test_syndrome_measurement_circuit_on_bit_flip_code()
     pass

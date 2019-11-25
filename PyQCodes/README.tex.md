@@ -1,5 +1,5 @@
-CODE
-====
+Quantum Codes
+=============
 
 This sections discusses two types of code and the functionalities.
 
@@ -64,15 +64,14 @@ register = eng.allocate_qureg(3)
 dephasing.encoding_circuit(eng, register, [0])
 
 # There are 1 X-logical operators and 1 Z-logical operators.
-# Apply the X Logical Operator or Z Logical Operator.
 dephasing.logical_circuit(eng, register, "X0")
 # dephasing.logical_circuit(eng, register, "Z0")
 
-# Apply the decoding circuit back to the 1-qubit state and
-# Keep first k-qubits and deallocate the rest of the two-qubits.
+# Apply decoding circuit to the 1-qubit state and delocate the last two qubits.
 dephasing.decoding_circuit(eng, register, deallocate_nqubits=True)
 
 Measure | register[0]
+
 # Since we applied the X-logical operator, it should be |1>.
 print("Should be one: ", int(register[0]))
 ```
@@ -90,9 +89,10 @@ def channel(eng, register):
         if prob < 0.1:
             XGate() | register[i]
          
-# Create and allocate three qubits.
+# Create and allocate three qubits. Always flush after allocating.
 eng = MainEngine()
 register = eng.allocate_qureg(3)
+eng.flush()
 
 # Apply the encoding circuit on the 1-qubit state |0>
 dephasing.encoding_circuit(eng, register, [0])
@@ -106,8 +106,8 @@ for stab in dephasing:
     
     # Error was found.
     if measurement == 1:
-        # Apply inverse of stabilizer
-        dephasing.stabilizer_circuit(eng, register, stab)
+        # Apply the stabilizer to reverse the error.
+        dephasing.apply_stabilizer_circuit(eng, register, stab)
 
 # Decode 
 dephasing.decoding_circuit(eng, register, deallocate_nqubits=True)

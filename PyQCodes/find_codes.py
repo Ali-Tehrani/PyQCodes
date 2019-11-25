@@ -250,7 +250,6 @@ class QDeviceChannel():
                 self._register = self.eng.allocate_qureg(self.numb_qubits)
                 self.eng.flush()
 
-
     def approximate_unitary_two_design(self, epsilon):
         r"""
         Construct the circuit for the epsilon-approximate unitary two design.
@@ -386,4 +385,3 @@ class QDeviceChannel():
                 ntimes_zero += 1
         self.eng.flush()
         return ntimes_zero / ntimes
-

@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 from abc import ABC, abstractmethod, abstractstaticmethod
-from projectq.ops import CNOT, H, S, Measure, All, QubitOperator, C, XGate, YGate, ZGate
+from projectq.ops import CNOT, H, HGate, S, Measure, All, QubitOperator, C, XGate, YGate, ZGate
 from projectq.meta import Control
 
 import numpy as np
@@ -152,6 +152,7 @@ class StabilizerCode():
         AssertionError :
             Raises an assertion error if the stabilizer elements do not commute with one another or
             Stabilizer do not match the dimension of the code parameters.
+
         """
         if isinstance(stabilizer_group[0], str):
             # Convert from string to binary representations.
@@ -167,6 +168,7 @@ class StabilizerCode():
         self._n = n
         self._k = k
         assert self._is_stabilizer_code()
+        self._pauli_stab = [StabilizerCode.binary_rep_to_pauli_str(x) for x in stabilizer_group]
 
         # The attributes from constructing the standard normal form, its rank and logical operators.
         self.normal_form, self.rank = self._standard_normal_form()
@@ -196,6 +198,11 @@ class StabilizerCode():
         return self._stab_bin_rep
 
     @property
+    def pauli_stab(self):
+        r"""Return the stabilizer in pauli string format."""
+        return self._pauli_stab
+
+    @property
     def logical_x(self):
         return self._logical_x
 
@@ -204,7 +211,7 @@ class StabilizerCode():
         return self._logical_z
 
     def __iter__(self):
-        for stab in self.stab_bin_rep:
+        for stab in self.normal_form:
             yield stab
 
     def _is_stabilizer_code(self):
@@ -377,7 +384,9 @@ class StabilizerCode():
                 if pauli_element == 'X':
                     XGate() | register[i]
                 elif pauli_element == 'Y':
-                    QubitOperator('Y' + str(i), -1.j) | register
+                    # ZGate() | register[i]
+                    # XGate() | register[i]
+                    QubitOperator('Y' + str(i), 1) | register
                 elif pauli_element == 'Z':
                     ZGate() | register[i]
                 elif pauli_element == "I":
@@ -417,12 +426,8 @@ class StabilizerCode():
         """
         assert len(state) == self.k, "State should be the number of unencoded qubits k."
         assert len(register) == self.n, "Number of qubits should be number of encoded qubits n."
-        numb_qubits = len(eng.active_qubits)
 
         logical_x = self.logical_x
-        # print("logical x operators:")
-        # print(logical_x)
-
         # Construct The last k qubits to become the specified attribute 'state'.
         for i, binary in enumerate(state):
             assert binary in [0, 1], "state should be all binary elements."
@@ -449,53 +454,73 @@ class StabilizerCode():
         # the first type 1 stabilizer generators.
         for i in range(0, self.rank):
             # Apply hadamard gate to every encoded qubit.
-            H | register[i]
-            eng.flush()
-            # Get normal stabilizer generator.
-            stab = self.normal_form[i].copy()
-            # print("The ith qubit is ", i)
-            # print("normal stabilizer is ", stab[: self.n], stab[self.n : ])
+            HGate() | register[i]
 
-            # Remove any pauli operator acting on the ith qubit.
-            if stab[i] == 1:
-                stab[i] = 0
-            if stab[i + self.n] == 1:
-                stab[i + self.n] = 0
-            # Remove the ith qubit
-            print("The ith qubit removed ", stab[: self.n], stab[self.n : ])
-
-            # Get pauli operator
-            pauli = self.binary_rep_to_pauli_str(stab)
-            print("pauli string ", pauli)
-            # print("The pauli string is ", pauli)
+            # Get pauli operator of normal stabilizer generator.
+            pauli = self.binary_rep_to_pauli_str(self.normal_form[i])
 
             # Apply controlled operators with the ith-qubit being controlled.
-
-            # print("controled qubit ", i)
             with Control(eng, register[i]):
-                pauli_string = ""
                 for j, pauli_op in enumerate(pauli):
                     if j != i:  # The ith qubit is controlled.
-                        # print("J, pauli ", j, pauli_op)
                         if pauli_op == 'X':
-                            # pauli_string += 'X' + str(j) + " "
                             XGate() | register[j]
                         elif pauli_op == 'Y':
-                            # pauli_string += 'Y' + str(j) + " "
+                            # ZGate() | register[j]
+                            # XGate() | register[j]
                             # YGate() | register[j]
-                            QubitOperator('Y' + str(j), -1.j) | register
+                            QubitOperator('Y' + str(j), 1.j) | register
                         elif pauli_op == 'Z':
-                            # pauli_string += "Z" + str(j) + " "
                             #  Z Gate Acts trivially on |0000 \delta>
                             # if j < i:
                             ZGate() | register[j]
-                # gate = QubitOperator(pauli_string)
-                # print(gate)
-                # gate | register
-                    eng.flush()
-            # print("prob ampltidude ", eng.backend.get_amplitude("010011111", register))
             eng.flush()
-            # print("")
+        eng.flush()
+
+    def apply_stabilizer_circuit(self, eng, register, stabilizer):
+        r"""
+        Apply the stabilizer circuit to a ProjectQ Engine.
+
+        Example: Applying "XYI" does X to first qubit register[0], and Y to second qubit
+        register[1].
+
+        Parameters
+        ----------
+        eng : BasicEngine
+            The ProjectQ engine.
+        register : list
+            Holds the qubits.
+        stabilizer : str or np.ndarray
+            Either a pauli string representing one stabilier element or the binary representation
+            of the one stabilizer element.
+
+        Notes
+        -----
+        - Engine is flushed after.
+
+        Examples
+        --------
+        >> eng = Project Q engine
+        >> register = Qubits of Register
+        >> apply_stabilizer_circuit(eng, register, "XXY")
+
+        """
+        if isinstance(stabilizer, (list, np.ndarray)):
+            # Convert to Pauli String.
+            pauli_str = StabilizerCode.binary_rep_to_pauli_str(stabilizer)
+
+        for i, pauli_op in enumerate(pauli_str):
+            print(pauli_op)
+            if pauli_op == "X":
+                XGate() | register[i]
+            elif pauli_op == "Z":
+                ZGate() | register[i]
+            elif pauli_op == "Y":
+                # ZGate() | register[i]
+                # XGate() | register[i]
+                # YGate() | register[i]
+                QubitOperator('Y' + str(i), 1j) | register
+        eng.flush()
 
     def decoding_circuit(self, eng, register, add_ancilla_bits=False, deallocate_nqubits=False):
         r"""
@@ -518,6 +543,16 @@ class StabilizerCode():
             If True, at the end of decoding it will discard and delete the 'register' and will only
             have the k, ancilla qubits.
 
+        Returns
+        -------
+        list :
+            If deallocate_nqubits is false, it returns the original 'register' plus the ancilla
+            register appended towards the end.
+            If deallocate_nqubits is True.
+                If add_ancilla_bits is True, it returns the ancilla register that was created.
+                If add_ancilla_bits is False, it assumes the register has the ancilla bits and
+                returns that.
+
         Notes
         -----
         - To construct the most optimal decoding circuit. The standard form for the stabilizer
@@ -535,7 +570,6 @@ class StabilizerCode():
             register_ancilla = eng.allocate_qureg(self.k)
         else:
             register_ancilla = register[self.n:]
-
         logical_x = self.logical_x
         logical_z = self.logical_z
 
@@ -556,7 +590,10 @@ class StabilizerCode():
                     if pauli_op == "X":
                         XGate() | register[j_qubit]
                     elif pauli_op == "Y":
-                        QubitOperator('Y' + str(j_qubit), -1.j) | register
+                        # YGate() | register[j_qubit]
+                        ZGate() | register[j_qubit]
+                        XGate() | register[j_qubit]
+                        # QubitOperator('Y' + str(j_qubit), -1.j) | register
                     elif pauli_op == "Z":
                         ZGate() | register[j_qubit]
 
@@ -609,12 +646,14 @@ class StabilizerCode():
             logical_y_ith = (self.logical_z[int(pauli_op[1])] +
                              self.logical_x[int(pauli_op[1])]) % 2
             pauli_str = StabilizerCode.binary_rep_to_pauli_str(logical_y_ith)
-
+        print("pauli ", pauli_str)
         for i, pauli_op in enumerate(pauli_str):
             if pauli_op == "X":
                 XGate() | register[i]
             elif pauli_op == "Y":
-                QubitOperator('Y' + str(i), -1.j) | register
+                ZGate() | register[i]
+                XGate() | register[i]
+                # QubitOperator('Y' + str(i), -1.j) | register
             elif pauli_op == "Z":
                 ZGate() | register[i]
 
@@ -629,9 +668,6 @@ class StabilizerCode():
         """
         normalizer = self.normalizer()
         return [self._convert_binary_representation_to_pauli(x) for x in normalizer]
-
-    def correction(self):
-        pass
 
     def _gaussian_elimination_first_block(self):
         r"""
