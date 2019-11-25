@@ -468,7 +468,7 @@ def test_qubit_condition():
 #
 #             epsilon = 1
 #             phases = chan_dev.approximate_unitary_two_design(epsilon)
-#             chan_dev.apply_inverse_of_unitary_two_design(phases)
+#             chan_dev.inverse_of_unitary_two_design(phases)
 #
 #             All(Measure) | register
 #             results = [int(x) for x in register]

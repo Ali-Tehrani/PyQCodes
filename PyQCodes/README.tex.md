@@ -78,7 +78,7 @@ print("Should be one: ", int(register[0]))
 
 A quantum error correction can be modeled.
 ```python
-from projectq.ops import XGate
+from projectq.ops import XGate, All, Measure
 
 # Bit-flip map with probability of 0.1 as error.
 def channel(eng, register):
@@ -108,9 +108,13 @@ for stab in dephasing:
     if measurement == 1:
         # Apply the stabilizer to reverse the error.
         dephasing.apply_stabilizer_circuit(eng, register, stab)
+        break
 
 # Decode 
 dephasing.decoding_circuit(eng, register, deallocate_nqubits=True)
+
+# Deallocate the register so it exits properly.
+All(Measure) | register
 ```
 
 

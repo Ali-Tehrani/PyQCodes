@@ -22,10 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 import numpy as np
-from projectq.ops import H, Measure, All, R
-from projectq.meta import Control
+from scipy.optimize import differential_evolution
 
 from PyQCodes.chan.channel import AnalyticQChan
+from PyQCodes.device_adaptor import ProjectQDeviceAdaptor
 from PyQCodes.codes import StabilizerCode
 
 r"""
@@ -34,17 +34,7 @@ One can optimize the average fidelity or coherent information of the channel
 with respect to either the decoder, encoder, or have them both fixed.
 """
 
-__all__ = ["effective_coherent_info", "optimize_both"]
-
-
-def optimize_encoder(kraus_chan, kraus_decod, objective="coherent", sparse=False,
-                     param_dens="over", param_decoder=""):
-    pass
-
-
-def optimize_both(kraus_chan, objective="coherent", sparse=False,
-                     param_dens="over", param_decoder=""):
-    pass
+__all__ = ["effective_coherent_info", ""]
 
 
 def effective_coherent_info(kraus_encod, kraus_chan, kraus_decods, objective="coherent",
@@ -194,43 +184,37 @@ class QDeviceChannel():
     Represent a quantum circuit as a function 'circuit_chan' using the ProjectQ Engines.
 
     """
+
     def __init__(self, eng, register, circuit_chan, real_device=False):
         r"""
+        Construct the QDeviceChannel.
 
         Parameters
         ----------
-        numb_qubits : int
-            Number of qubits
-
-        circuit : callable
-            Should take as input the engine from 'ProjectQ.cengines'.
-
-        engine :
+        engine : BasicEngine
             Should be one of the following types from 'ProjectQ.cengines'. Should
             be of type "BasicEngine" from ProjectQ. See their documentation
             for more details,
             "https://projectq.readthedocs.io/en/latest/projectq.cengines.html".
-
+        register : list
+            List of qubits in the register.
+        circuit(eng, register) : callable
+            Should take as input the engine from 'ProjectQ.cengines' and the register.
         real_device : bool
             Boolean indicating whether it's being runned on a real quantum device.
 
-        Returns
-        -------
-
         """
-        self._eng = eng
-        self._register = register
-        self._numb_qubits = len(register)
         self._channel = circuit_chan
         self._real_device = real_device
+        self._device = ProjectQDeviceAdaptor(eng, register, real_device)
 
     @property
     def eng(self):
-        return self._eng
+        return self._device._eng
 
     @property
     def register(self):
-        return self._register
+        return self._device._register
 
     @property
     def channel(self):
@@ -238,150 +222,118 @@ class QDeviceChannel():
 
     @property
     def numb_qubits(self):
-        return self._numb_qubits
+        return self._device._numb_qubits
 
-    def set_register_to_zero(self, cheat=False):
-        if not self._real_device:
-            if cheat:
-                probability = [1.] + [0.] * (self.numb_qubits - 1)
-                self.eng.backend.set_wavefunction(probability, self.register)
-            else:
-                self.eng.flush(deallocate_qubits=True)
-                self._register = self.eng.allocate_qureg(self.numb_qubits)
-                self.eng.flush()
-
-    def approximate_unitary_two_design(self, epsilon):
+    def estimate_average_fidelity_channel(self, ntimes, epsilon):
         r"""
-        Construct the circuit for the epsilon-approximate unitary two design.
-
-        Parameters
-        ----------
-        epsilon : float
-            The error for the approximate unitary two design.
-
-        Returns
-        -------
-        list :
-            The random phases used for the circuit. This can is only intended to be used for the
-            inverse of the unitary two design circuit.
-
-        References
-        ----------
-        - See 'doi:10.1063/1.4983266'.
-
-        Notes
-        -----
-        Note that this algorithm assumes there exists two qubit gates inbetween all qubits.
-        """
-        phases = [0, 2. * np.pi / 3., 4. * np.pi / 3.]
-        l = int(np.ceil(np.log2(1. / epsilon) / self.numb_qubits))
-        numb_times = 2 * l + 1
-
-        # Store the random phases used, in-order to compute the inverse of the unitary 2-design.
-        random_phases_used = []
-        for _ in range(0, numb_times):
-            ith_phases_used = []
-
-            # Get uniformly sampled phases.
-            random_phases = np.random.choice(phases, size=(self.numb_qubits,))
-            # Apply the single qubit phase gates in the diagonal Z-basis.
-            for i in range(0, self.numb_qubits):
-                ith_phases_used.append(random_phases[i])
-                R(random_phases[i]) | self.register[i]
-
-            for i in range(0, self.numb_qubits):
-                with Control(self.eng, self.register[i]):
-                    for j in range(0, self.numb_qubits):
-                        if i != j:
-                            # Get a random phase.
-                            phase = np.random.choice([0, np.pi], size=1)
-                            ith_phases_used.append(phase[0])
-
-                            R(phase) | self.register[j]
-
-            # Store the phases used in the '_'th iteration.
-            random_phases_used.append(ith_phases_used)
-            All(H) | self.register
-            self.eng.flush()
-
-        # Reverse the random phases.
-        random_phases_used.reverse()
-        return random_phases_used
-
-    def apply_inverse_of_unitary_two_design(self, random_phases):
-        r"""
-        Applies the inverse U^{-1} of a unitary 2-design generated from random phases.
-
-        Parameters
-        ----------
-        random_phases : list of lists
-
-        Returns
-        -------
-
-        """
-        for ith_phases in random_phases:
-            All(H) | self.register
-
-            # Go though the inverse gates.
-            counter = 1
-            for i in range(self.numb_qubits - 1, -1, -1):
-                with Control(self.eng, self.register[i]):
-                    for j in range(self.numb_qubits - 1, -1, -1):
-                        if i != j:
-                            R(ith_phases[-counter]) | self.register[j]
-                            counter += 1
-
-            # Apply the single qubit phase gates in the diagonal Z-basis.
-            for i in range(self.numb_qubits - 1, -1, -1):
-                R(-ith_phases[-counter]) | self.register[i]
-                counter += 1
-
-            self.eng.flush()
-
-    def estimate_average_fidelity(self, ntimes, epsilon):
-        r"""
-        Estimate the average fidelity by epsilon-approximate unitary two design.
+        Estimate the average fidelity of the quantum channel.
 
         Parameters
         ----------
         ntimes : int
             The number of trials to sample.
-
         epsilon : float
             The approximation to the unitary two design.
 
         Returns
         -------
         float :
-            The average fidelity of the quantum circuit.
+            The estimated average fidelity of the quantum circuit.
+        """
+        return self._device.estimate_average_fidelity(self.channel, ntimes, epsilon)
+
+    def estimate_average_fidelity_error_code(self, encoder, decoder, ntimes, epsilon):
+        r"""
+        Estimate average fidelity of encoder, with channel, with decoder as fixed functions.
+
+        Parameters
+        ----------
+        encoder(eng, register) : callable
+            The encoding circuit as a callable function that takes input engine and its register.
+        decoder(eng, register) : callable
+            The decoding circuit as a callable function that takes input engine and its register.
+        ntimes : int
+            The number of trials to sample.
+        epsilon : float
+            The approximation to the unitary two design.
+
+        Returns
+        -------
+        float :
+            The estimated average fidelity of the decoder composed with the channel composed
+            with the encoder.
 
         """
-        # Set engine to all zero.
+        # Represent the channel for the error correcting process.
+        def total_channel(eng, register):
+            encoder(eng, register)
+            self.channel(eng, register)
+            decoder(eng, register)
 
-        # Number of times it is zero.
-        ntimes_zero = 0.
-        for _ in range(0, ntimes):
-            # Set register to zero.
-            self.set_register_to_zero(cheat=True)
+        return self._device.estimate_average_fidelity(total_channel, ntimes, epsilon)
 
-            print(self.eng.backend.cheat())
+    def optimize_encoder_decoder_average_fidelity(self, encoder, decoder, ntimes, epsilon,
+                                                  numb_parameters, bounds, optimizer="diffev",
+                                                  maxiter=10):
+        r"""
+        Optimize the average fidelity of a channel of the parameters of the encoder and decoder.
 
-            # Apply the approximate unitary two design.
-            random_phase = self.approximate_unitary_two_design(epsilon)
+        The encoder and decoder are paramterized by a set of parameters that are bounded.
 
-            # Apply the quantum channel
-            self.channel(self.eng, self.register)
+        Parameters
+        ----------
+        encoder(eng, register, parameters) : callable
+            A callable function that represents the encoder acting on the engine and register
+            which is dependent on the parameters.
+        decoder(eng, register, parameters) : callable
+            A callable function that represents the decoder acting on the engine and register
+            which is dependent on the parameters.
+        ntimes : int
+            The number of trials to sample.
+        epsilon : float
+            The approximation to the unitary two design.
+        numb_parameters : tuple
+            Tuple (M, N), where M is the number of parameters of the encoder and N is the number
+            of parameters of the decoder.
+        bounds : list of tuples
+            List of tuples (l^i_bnd, u^i_bnd) that bound first the parameters of the encoder,
+            then second the parameters of the decoder.
+        optimizer : str
+            Which optimizer to choose.
+            If "diffev", then it optimizes using differential evolution from Scipy.
+        maxiter : int
+            The maximum number of iterations. Default is 10.
 
-            # Apply the inverse of the approximate unitary two design.
-            self.apply_inverse_of_unitary_two_design(random_phase)
+        Returns
+        -------
+        results : dict
+            Returns a dictionary with the following fields.
+                "success" : Whether it was successful or not.
+                "optimal_val" : The optimal average fidelity found.
+                "params_encoder" : The optimal parameters of the encoder.
+                "params_decoder" : The optimal parameters of the decoder.
 
-            # Measure in computational basis
-            All(Measure) | self.register
-            self.eng.flush()
+        """
+        nparams_encoder = numb_parameters[0]
+        nparams_decoder = numb_parameters[1]
+        assert len(bounds) == nparams_encoder + nparams_decoder, "The length of bounds should be " \
+                                                                 "the number of parameters of " \
+                                                                 "encoder and decoder."
 
-            result = np.array([int(x) for x in self.register], dtype=np.int)
-            if np.all(result == 0.):
-                ntimes_zero += 1
-        self.eng.flush()
-        return ntimes_zero / ntimes
+        def total_channel(eng, register, parameters):
+            encoder(eng, register, parameters[:nparams_encoder])
+            self.channel(eng, register)
+            decoder(eng, register, parameters[nparams_encoder:])
+
+        def objective_func(parameters, eng, register):
+            return self._device.estimate_average_fidelity(total_channel, ntimes, epsilon)
+
+        if optimizer == "diffev":
+            result = differential_evolution(objective_func, bounds=bounds, maxiter=maxiter,
+                                            args=(self.eng, self.register))
+        else:
+            raise ValueError("Does not recognize optimizer: " + str(optimizer))
+
+        output = {"success" : result["success"], "params_encoder": result["x"][:nparams_encoder],
+                  "params_decoder": result["x"][nparams_encoder:], "optimal_val": result["fun"]}
+        return output

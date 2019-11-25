@@ -47,23 +47,30 @@ XS, YS, ZS, IS = [csr_matrix(X, dtype=np.complex128),
 
 
 class QCode(ABC):
-    r"""
-    Abstract base class for quantum codes.
+    r"""Abstract base class for quantum codes."""
 
-    """
-    def __init__(self, encoder, decoder, correction, n, k):
+    def __init__(self, encoder, decoder, syndrome_measure, correct, n, k):
+        r"""Contruct quantum codes based on basic properties."""
         pass
 
     @abstractmethod
-    def encode(self):
+    def encode(self, eng, register):
+        r"""Represent the encoding process from k-qubits to n-qubits."""
         pass
 
     @abstractmethod
-    def decode(self):
+    def decode(self, eng, register):
+        r"""Represent the decoding process from n-qubits to k-qubits."""
         pass
 
     @abstractmethod
-    def correct(self):
+    def syndrome_measure(self, eng, register, measurement):
+        r"""Represent the syndrome measurement of the measurement."""
+        pass
+
+    @abstractmethod
+    def correct(self, eng, register, operator):
+        r"""Correct the error by applying operator."""
         pass
 
 
@@ -111,7 +118,9 @@ class StabilizerCode():
     # This is the same as
     >> stab_generators = ["ZZI", "ZIZ"]
     >> stabilizer = StabilizerCode(binary_rep, n=3, k=1)
+
     """
+
     def __init__(self, stabilizer_group, n, k, logical_ops=None):
         r"""
         Construct the stabilizer code.
@@ -172,7 +181,7 @@ class StabilizerCode():
 
         # The attributes from constructing the standard normal form, its rank and logical operators.
         self.normal_form, self.rank = self._standard_normal_form()
-        if logical_ops == None:
+        if logical_ops is None:
             self._logical_x, self._logical_z = self.logical_operators()
         else:
             assert isinstance(logical_ops[0], np.ndarray), "X Logical operators should be in a " \
@@ -180,21 +189,24 @@ class StabilizerCode():
             assert isinstance(logical_ops[1], np.ndarray), "Z logical operators should be in a " \
                                                            "numpy array."
             assert logical_ops[0].shape[1] == 2*n, "Number of columns of X logical operators " \
-                                                    "should be 2*n."
+                                                   "should be 2*n."
             assert logical_ops[1].shape[1] == 2*n, "Number of columns of Z logical operators " \
-                                                    "should be 2*n."
+                                                   "should be 2*n."
             self._logical_x, self._logical_z = logical_ops
 
     @property
     def n(self):
+        r"""Obtain the total number of encoded qubits."""
         return self._n
 
     @property
     def k(self):
+        r"""Obtain the number of unencoded qubits."""
         return self._k
 
     @property
     def stab_bin_rep(self):
+        r"""Obtain the original binary representation provided."""
         return self._stab_bin_rep
 
     @property
@@ -204,13 +216,16 @@ class StabilizerCode():
 
     @property
     def logical_x(self):
+        r"""Obtain the logical X operators."""
         return self._logical_x
 
     @property
     def logical_z(self):
+        r"""Obtain the logical Z operators."""
         return self._logical_z
 
     def __iter__(self):
+        r"""Iterate through the stabilizer generators in the normal form."""
         for stab in self.normal_form:
             yield stab
 
@@ -222,11 +237,12 @@ class StabilizerCode():
         ------
         bool
             True if pauli elements are commutative inside the stabilizer group.
+
         """
         is_stabilizer_code = True
         for i in range(0, self.numb_stab):
             for j in range(0, self.numb_stab):
-                if i != j: # Don't compare the same stabilizer elements to itself.
+                if i != j:  # Don't compare the same stabilizer elements to itself.
                     paul1 = self.stab_bin_rep[i]
                     paul2 = self.stab_bin_rep[j]
                     # Value of zero (False) indicates they they commute.
@@ -257,6 +273,7 @@ class StabilizerCode():
         one another. The code-space is the sub-space of vectors that are in the plus one
         eigenspace of each stabilizer generator. The orthonormal basis is found by simultaneously
         diagonalizing each stabilizer generator S_1, ..., S_{n-k} together.
+
         """
         def _obtain_eigenspace_one(eigen, vecs):
             return vecs[:, np.abs(eigen - 1,) < 1e-5]
@@ -339,20 +356,22 @@ class StabilizerCode():
         circuit, then deletes the allocated qubit. If length of register is n+1, then it uses the
         last qubit in the register as a measurement ancilla.
 
+        Stabilizer element is recommended to be in standard normal form.
+
         Parameters
         ----------
         eng : ProjectQ Engine
-
+            The quantum circuit engine.
         register : ProjectQ Qureg or list of Qubit
             Either a quantum register or a list of qubits.
-
         stabilizer : (np.ndarray(2n,) or string)
             Binary representation of the stabilizer element or pauli string.
 
         Returns
         -------
         int :
-            The measurement corresponding to the stabilizer element.
+            The measurement corresponding to the stabilizer element. Zero means it commutes and
+            negative one means it anti-commutes.
 
         References
         ----------
@@ -363,8 +382,8 @@ class StabilizerCode():
 
         # The additional qubit is for measurement purposes.
         if numb_qubits != self.n and numb_qubits != self.n + 1:
-            raise TypeError("Number of qubits allocated should match the number of encoded qubits n "
-                            "from (n,k) code or match n + 1, where last qubit is used as an "
+            raise TypeError("Number of qubits allocated should match the number of encoded qubits n"
+                            " from (n,k) code or match n + 1, where last qubit is used as an "
                             "ancilla.")
 
         # Allocate a new qubit for measurement, if it doesn't have it already.
@@ -377,25 +396,28 @@ class StabilizerCode():
         pauli_str = stabilizer
         if isinstance(stabilizer, np.ndarray):
             pauli_str = self.binary_rep_to_pauli_str(np.array(stabilizer))
-
+        print(pauli_str)
         H | measure_qubit
-        for i, pauli_element in enumerate(pauli_str):
-            with Control(eng, measure_qubit):
+        eng.flush()
+        with Control(eng, measure_qubit):
+            for i, pauli_element in enumerate(pauli_str):
                 if pauli_element == 'X':
                     XGate() | register[i]
                 elif pauli_element == 'Y':
                     # ZGate() | register[i]
                     # XGate() | register[i]
-                    QubitOperator('Y' + str(i), 1) | register
+                    QubitOperator('Y' + str(i), 1.) | register
                 elif pauli_element == 'Z':
                     ZGate() | register[i]
                 elif pauli_element == "I":
                     pass
                 else:
                     raise RuntimeError("Pauli strings contained an unknown character.")
+            eng.flush()
         H | measure_qubit
+        eng.flush()
         Measure | measure_qubit
-
+        eng.flush()
         result = int(measure_qubit)
         if numb_qubits == self.n:
             del measure_qubit
@@ -403,17 +425,13 @@ class StabilizerCode():
 
     def encoding_circuit(self, eng, register, state):
         r"""
-        Constructs the encoding circuit to map the k-qubit "state" to its n-qubit state.
+        Apply the encoding circuit to map the k-qubit "state" to its n-qubit state.
 
         Parameters
         ----------
         state : list
             list of k-items, where each item is either 0 to 1 corresponding to the quantum state
             |x_1, ... , x_k>, where x_i is either zero or one.
-
-        Returns
-        -------
-
 
         Notes
         -----
@@ -422,7 +440,8 @@ class StabilizerCode():
 
         References
         ----------
-        -- See Gaitan book "Quantum Error-Correction and Fault Tolerant Quantum Computing."
+        - See Gaitan book "Quantum Error-Correction and Fault Tolerant Quantum Computing."
+
         """
         assert len(state) == self.k, "State should be the number of unencoded qubits k."
         assert len(register) == self.n, "Number of qubits should be number of encoded qubits n."
@@ -519,7 +538,7 @@ class StabilizerCode():
                 # ZGate() | register[i]
                 # XGate() | register[i]
                 # YGate() | register[i]
-                QubitOperator('Y' + str(i), 1j) | register
+                QubitOperator('Y' + str(i), 1.) | register
         eng.flush()
 
     def decoding_circuit(self, eng, register, add_ancilla_bits=False, deallocate_nqubits=False):
@@ -630,6 +649,13 @@ class StabilizerCode():
 
         Examples
         --------
+        >> eng = ProjectQ engine...
+        >> register = List of qubits in the engine.
+        Apply the logical X operator on the first qubit.
+        >> code.logical_circuit(eng, register, "X0")
+        Apply the logical Z operator on the second qubit.
+        >> code.logical_circuit(eng, register, "Z1"0
+
         """
         assert len(pauli_op) == 2, "'pauli_op' should be length two."
         assert pauli_op[0] in ['X', 'Y', 'Z'], "First character of 'pauli_op' should be X, Y or Z."
@@ -646,14 +672,12 @@ class StabilizerCode():
             logical_y_ith = (self.logical_z[int(pauli_op[1])] +
                              self.logical_x[int(pauli_op[1])]) % 2
             pauli_str = StabilizerCode.binary_rep_to_pauli_str(logical_y_ith)
-        print("pauli ", pauli_str)
+
         for i, pauli_op in enumerate(pauli_str):
             if pauli_op == "X":
                 XGate() | register[i]
             elif pauli_op == "Y":
-                ZGate() | register[i]
-                XGate() | register[i]
-                # QubitOperator('Y' + str(i), -1.j) | register
+                QubitOperator('Y' + str(i), 1.j) | register
             elif pauli_op == "Z":
                 ZGate() | register[i]
 
@@ -665,13 +689,14 @@ class StabilizerCode():
         -------
         list :
             Returns a list of strings of each pauli element in N(S) - S.
+
         """
         normalizer = self.normalizer()
         return [self._convert_binary_representation_to_pauli(x) for x in normalizer]
 
     def _gaussian_elimination_first_block(self):
         r"""
-        Perform Gaussian Elimination On the first block G1 from binary representation [G1 | G2]
+        Perform Gaussian Elimination On the first block G1 from binary representation [G1 | G2].
 
         Returns
         -------
@@ -689,6 +714,7 @@ class StabilizerCode():
         -----
         -- Should produce a [I A | B C]
                             [0 0 | D E] matrix, where I is identity with rank of G1.
+
         """
         output = self.stab_bin_rep.copy()
 
@@ -736,11 +762,16 @@ class StabilizerCode():
 
     def _gaussian_elimination_second_block(self, binary_rep, rank):
         r"""
+        Perform Gaussian Elimination of the Z component of binary representation.
+
+        The binary_rep provided must have already performed _gaussian_elimination_first_block.
 
         Parameters
         ----------
         binary_rep : np.ndarray
             Binary representation where gaussian elimination was performed on G1 in [G1 | G2].
+            G1 was already have gaussian elimination been attempted on it from the function,
+            "_gaussian_elimination_first_block".
 
         Returns
         -------
@@ -750,12 +781,18 @@ class StabilizerCode():
                 [[I A1 A2 | B C1 C2]
                 [0 0 0   | D I E]]
 
+        Notes
+        -----
+        - Unlike "_gaussian_elimination_first_block", this does not have sophicasted swapping
+        (ie being able to swap diagonally). It only attempts to swap the based on row then
+        based on columns.
+
         """
         if rank == binary_rep.shape[0]:
             return binary_rep
 
         output = binary_rep.copy()
-        rank_E = np.linalg.matrix_rank(output[rank:, self.n + rank : ])
+        rank_E = np.linalg.matrix_rank(output[rank:, self.n + rank:])
 
         # Swap rows to ensure the diagonal elements are all ones.
         # TODO: Add More "Powerful" Swaps like in _gaussian_elimination_first_block
@@ -815,18 +852,18 @@ class StabilizerCode():
 
         Returns
         -------
+        (array, array, array, array) :
+            Returns the matrices respectively A_2, E, C_1, C_2
 
         """
         # Do assertions that the first block is the identity.
         assert np.all(np.abs(np.eye(rank, dtype=np.int) - standard_form[:rank, :rank]) < 1e-5), \
             "The standard form should have identity matrix in the top-left."
 
-        # a1 = standard_form[:rank, rank : self.n - self.k]
-        a2 = standard_form[:rank, self.n - self.k : self.n]
-        # b = standard_form[:rank, self.n : self.n + rank]
-        c1 = standard_form[:rank, self.n + rank : 2 * self.n - self.k]
-        c2 = standard_form[:rank, 2 * self.n - self.k :]
-        e = standard_form[rank:, 2 * self.n - self.k :]
+        a2 = standard_form[:rank, self.n - self.k: self.n]
+        c1 = standard_form[:rank, self.n + rank: 2 * self.n - self.k]
+        c2 = standard_form[:rank, 2 * self.n - self.k:]
+        e = standard_form[rank:, 2 * self.n - self.k:]
         return a2, e, c1, c2
 
     def logical_operators(self):
@@ -847,6 +884,7 @@ class StabilizerCode():
         References
         ----------
         See Frank Gaitan's book, chapter 4.
+
         """
         # Turn binary representation of stabilizer code into standard normal form.
         block, rank = self.normal_form, self.rank
@@ -890,9 +928,7 @@ class StabilizerCode():
         return (pauli1[:n].dot(pauli2[n:]) + pauli1[n:].dot(pauli2[:n])) % 2
 
     def generator_set_pauli_elements(self):
-        r"""
-        Return the set of all generators of pauli elements, without the identity element.
-        """
+        r"""Return the set of all generators of pauli elements, without the identity element."""
         # TODO: Apprently the generators is just the identity matrix.
         # All combinations in the x-components of the binary representation.
         x_comps = np.zeros((self.n, self.n), dtype=np.int)
@@ -929,7 +965,7 @@ class StabilizerCode():
                     does_commute = False
                     break
             # If it commutes and satisfies couple of generator conditions.
-            if does_commute:# and self._generator_conditions(np.array(pauli)):
+            if does_commute:
                 normalizer.append(pauli)
         return np.array(normalizer)
 
@@ -937,6 +973,8 @@ class StabilizerCode():
     def concatenate_codes(stab1, stab2):
         r"""
         Concatenate two stabilizer codes S1 and S2 to create a code "S2 composed S1", with S1 first.
+
+        Code concatenation only works when l divides n.
 
         Parameters
         ----------
@@ -953,6 +991,11 @@ class StabilizerCode():
         -------
         StabilizerCode
             Returns stabilizer code for the new concatenated code.
+
+        Raises
+        ------
+        ValueError :
+            Code concatenation only works when l divides n.
 
         """
         assert isinstance(stab1, StabilizerCode)
@@ -1011,8 +1054,8 @@ class StabilizerCode():
             numb_blocks = n // l
             total_qubits = numb_blocks * m
 
-            for i in range(0, numb_blocks): # Go Through Each Block
-                for j in range(0, stab2.numb_stab): # Copy the Stabilizers of Code 2 to each Block.
+            for i in range(0, numb_blocks):  # Go Through Each Block
+                for j in range(0, stab2.numb_stab):  # Copy the Stabilizers of Code 2 to each Block.
                     new_gen_x = [0] * (i * m)
                     new_gen_z = [0] * (i * m)
 
@@ -1026,14 +1069,8 @@ class StabilizerCode():
             # Go through each generator from stab1.
             logical_x = stab2.logical_x
             logical_z = stab2.logical_z
-            print("Logical X operators ", logical_x)
-            print("Number of blocks ", numb_blocks)
-            print("Number of logical X operators ", logical_x.shape[0])
-            print("\n")
-            print("##### START ######")
             for i in range(0, stab1.numb_stab):
                 stabilizer = stab1.stab_bin_rep[i]
-                print("Stabilizer of Code 1 ", stabilizer)
                 new_gen_x = np.zeros((total_qubits), dtype=np.int)
                 new_gen_z = np.zeros((total_qubits), dtype=np.int)
 
@@ -1041,34 +1078,26 @@ class StabilizerCode():
                     which_logical_op = j % numb_blocks  # Modulo the number of blocks.
 
                     which_block = int(np.floor(j / numb_blocks))
-                    print("WHICH BLOCK ", which_block)
-                    print("j pauli: ", j, pauli)
-                    print("which logical op: ", which_logical_op)
 
                     if pauli == 1 and stabilizer[n + j] == 0:  # X Block Operator.
                         current_logical = logical_x[which_logical_op]
-                    elif pauli == 0 and stabilizer[n + j] == 1: # Z Block Operator
+                    elif pauli == 0 and stabilizer[n + j] == 1:  # Z Block Operator
                         current_logical = logical_z[which_logical_op]
-                    elif pauli == 1 and stabilizer[n + j] == 1: # Y Block Operator
-                        current_logical = (logical_z[which_logical_op] + \
+                    elif pauli == 1 and stabilizer[n + j] == 1:  # Y Block Operator
+                        current_logical = (logical_z[which_logical_op] +
                                            logical_x[which_logical_op]) % 2
-                    print("Current Operators ", current_logical)
 
                     # Get the range of qubits that it acts on.
                     # TODO: should this be n or m.
                     range_qubits = (n * which_block, n * (which_block + 1))
-                    print("index range: ", range_qubits)
 
                     new_gen_x[range_qubits[0]: range_qubits[1]] = \
                         (new_gen_x[range_qubits[0]: range_qubits[1]] + current_logical[:m]) % 2
                     new_gen_z[range_qubits[0]: range_qubits[1]] = \
                         (new_gen_z[range_qubits[0]: range_qubits[1]] + current_logical[m:]) % 2
-                    print(new_gen_x, new_gen_z, "\n")
 
                 generator.append(np.hstack((new_gen_x, new_gen_z)))
-                print(generator[-1])
 
-            print(np.array(generator))
             return StabilizerCode(np.array(generator), total_qubits, k)
 
     @staticmethod
@@ -1107,7 +1136,8 @@ class StabilizerCode():
                 pauli += "X"
             elif z == 1:
                 pauli += "Z"
-            else: raise RuntimeError("Binary Representation is not correct.")
+            else:
+                raise RuntimeError("Binary Representation is not correct.")
         return pauli
 
     @staticmethod
@@ -1134,7 +1164,7 @@ class StabilizerCode():
             raise TypeError("Binary Representation needs to be two-dimensional.")
 
         operators = []
-        n = binary_rep.shape[1] // 2 # Number of qubits.
+        n = binary_rep.shape[1] // 2  # Number of qubits.
         # Go through each stabilizer element.
         for i, stab in enumerate(binary_rep):
             # Convert the first column to pauli-matrix.
@@ -1180,7 +1210,7 @@ class StabilizerCode():
                     binary_rep[i][j] = 1
                     binary_rep[i][j + n] = 1
                 elif p[j] == "I":
-                    pass # Do Nothing
+                    pass  # Do Nothing
                 else:
                     raise ValueError("Pauli string symbol not recognized: " + str(p[j]))
         return binary_rep

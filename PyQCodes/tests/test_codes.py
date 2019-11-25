@@ -24,7 +24,6 @@ THE SOFTWARE.
 import projectq
 import numpy as np
 from numpy.testing import assert_raises
-import itertools
 
 from projectq import MainEngine
 from projectq.ops import XGate, YGate, ZGate, HGate, All, Measure, QubitOperator
@@ -868,15 +867,16 @@ def test_syndrome_measurement_circuit_on_4_2_code():
 
         random_state = [i % 2, (i + np.random.random_integers(0, 3)) % 2]
         code.encoding_circuit(eng, quantum_reg, state=random_state)
-        print(eng.backend.cheat()[1])
+        wave_func_bef = np.array(eng.backend.cheat()[1])
         if i % 2 == 0:
-            measure_result = code.single_syndrome_measurement(eng, quantum_reg, "XZZX")
+            measure_result = code.single_syndrome_measurement(eng, quantum_reg, code.normal_form[0])
         else:
-            measure_result = code.single_syndrome_measurement(eng, quantum_reg, "YXXY")
-        print(eng.backend.cheat()[1])
+            measure_result = code.single_syndrome_measurement(eng, quantum_reg, code.normal_form[1])
+        wave_func_af = np.array(eng.backend.cheat()[1])
+        assert np.all(np.abs(wave_func_bef - wave_func_af) < 1e-4)
+        eng.flush()
         All(Measure) | quantum_reg
         eng.flush()
-        print(measure_result)
         assert measure_result == 0
 
         # Try applying a random logical circuit which should still be in the code-space.
@@ -951,6 +951,7 @@ def test_applying_circuit_stabilizers_on_bitflip_code():
 
 
 def test_applying_stabilizer_circuit_on_4_2_code():
+    r"""Test applying stabilier circuit on 4 2 code by obtaining the wave function."""
     n, k = 4, 2
     binary = np.array([[1, 0, 0, 1, 0, 1, 1, 0],
                        [1, 1, 1, 1, 1, 0, 0, 1]])
@@ -958,13 +959,18 @@ def test_applying_stabilizer_circuit_on_4_2_code():
     for j in range(0, 20):
         eng = MainEngine()
         quantum_reg = eng.allocate_qureg(4)
+        eng.flush()
+
+        # Apply Encoding circuit on random state.
         random_state = [j % 2, (j + np.random.randint(1, 4)) % 2]
         stabilizer.encoding_circuit(eng, quantum_reg, state=random_state)
 
+        # Get the wave-function before applying stabilizer
         result1 = np.array(eng.backend.cheat()[1])
         # Apply stabilizer which should affected the result.
         stabilizer.apply_stabilizer_circuit(eng, quantum_reg, binary[0])
         stabilizer.apply_stabilizer_circuit(eng, quantum_reg, binary[1])
+        stabilizer.apply_stabilizer_circuit(eng, quantum_reg, stabilizer.normal_form[1])
         result2 = np.array(eng.backend.cheat()[1])
         assert np.all(np.abs(result2 - result1) < 1e-4)
 
@@ -1217,11 +1223,7 @@ def test_encoding_circuit_8_3_is_the_same_from_book():
                            [0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1],
                            [0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]])
     code = StabilizerCode(binary_rep, n, k)
-    code.normal_form = np.array([[1, 0, 0, 0, 1, 1, 1, 0,   0, 1, 0, 0, 1, 1, 0, 1],
-                                 [0, 1, 0, 0, 1, 1, 0, 1,   0, 0, 1, 0, 1, 0, 1, 1],
-                                 [0, 0, 1, 0, 1, 0, 1, 1,   0, 1, 0, 1, 1, 0, 1, 0],
-                                 [0, 0, 0, 1, 0, 1, 1, 1,   0, 0, 1, 1, 1, 1, 0, 0],
-                                 [0, 0, 0, 0, 0, 0, 0, 0,   1, 1, 1, 1, 1, 1, 1, 1]])
+
     for state in [[0, 0, 0]]:
         eng = MainEngine()
         quantum_reg = eng.allocate_qureg(n)
@@ -1242,12 +1244,67 @@ def test_encoding_circuit_8_3_is_the_same_from_book():
         assert np.all(np.abs(wave_function_book - wave_function_code) < 1e-4)
 
 
+def test_syndrome_measurement_on_9_1_code():
+    r"""Test syndrome measurement circuit of shor code."""
+    n, k = 9, 1
+    binary_rep = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+                           [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                           [1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
+    code = StabilizerCode(binary_rep, n, k)
+
+    for state in [[0], [1]]:
+        for _ in range(0, 50): # Try this fifty times.
+            eng = MainEngine()
+            quantum_reg = eng.allocate_qureg(n)
+            eng.flush()
+
+            code.encoding_circuit(eng, quantum_reg, state=state)
+            wave_function_before = np.array(eng.backend.cheat()[1])
+
+            # Apply syndrome measurement based on normal form stabilizers.
+            random_int = np.random.randint(0, 8)
+            measurement = code.single_syndrome_measurement(eng, quantum_reg,
+                                                           code.normal_form[random_int])
+            wave_function_after = np.array(eng.backend.cheat()[1])
+            assert np.all(np.abs(wave_function_before - wave_function_after) < 1e-4)
+            assert measurement == 0
+            All(Measure) | quantum_reg
+
+            # Apply Error .
+            eng = MainEngine()
+            quantum_reg = eng.allocate_qureg(n)
+            eng.flush()
+
+            code.encoding_circuit(eng, quantum_reg, state=state)  # Encode
+            XGate() | quantum_reg[1]  # Apply Error.
+            # XGate() | quantum_reg[0]
+            # XGate() | quantum_reg[2]
+            # Apply syndrome measurement based on normal form stabilizers.
+            found_one = False
+            for i in range(0, 8):
+                measurement = code.single_syndrome_measurement(eng, quantum_reg,
+                                                               code.normal_form[i])
+                if measurement == 1:
+                    found_one = True
+            assert found_one
+            All(Measure) | quantum_reg
+
+
 if __name__ == "__main__":
+    test_applying_stabilizer_circuit_on_4_2_code()
+    # test_syndrome_measurement_on_9_1_code()
+    # test_syndrome_measurement_circuit_on_4_2_code()
+    assert 1 == 0
     # test_applying_stabilizer_circuit_on_random_code()
     # test_encoding_circuit_8_3_maps_to_plus_one_eigenspace()
 
     # test_encoding_circuit_shor_maps_to_plus_one_eigenspace()
-    # test_encoding_circuit_8_3_is_the_same_from_book()
+    test_encoding_circuit_8_3_is_the_same_from_book()
     # test_encoding_circuit_on_5_1_maps_to_plus_one_eigenspace()
     # test_encoding_circuit_5_1_is_the_same_from_book()
     # test_encoding_circuit_bit_flip_maps_to_plus_one_eigenspace()
