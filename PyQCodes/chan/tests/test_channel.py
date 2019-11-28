@@ -362,7 +362,7 @@ def test_minimum_fidelity_over_amplitude_damping():
         desired = np.sqrt(1 - p)
 
         actual = chan.optimize_fidelity(n=1, maxiter=100)
-        assert np.all(np.abs(desired - actual["optimal_val"]) < 1e-5)
+        assert np.all(np.abs(desired - actual["optimal_val"]) < 1e-3)
 
         # With Choi-Matrix
         choi_mat = sum([np.outer(np.ravel(x, order="F"),
@@ -378,7 +378,7 @@ def test_minimum_fidelity_over_identity_channel():
     chan = AnalyticQChan([k0], [1, 1], 2, 2)
     for n in range(1, 3):
         actual = chan.optimize_fidelity(n, maxiter=100)
-        assert np.all(np.abs(1. - actual["optimal_val"]) < 1e-5)
+        assert np.all(np.abs(1. - actual["optimal_val"]) < 1e-3)
 
 
 # Slow test
@@ -497,25 +497,3 @@ def test_multipling_channels_together():
     desired_kraus = [np.kron(x, kraus0[0]) for x in kraus]
     assert np.all(np.abs(new_chan.kraus - np.array(desired_kraus)) < 1e-4)
     assert new_chan.sparse
-
-
-if __name__ == "__main__":
-    test_multipling_channels_together()
-    # test_average_fidelity_on_bit_flip_chanel()
-    # test_average_fidelity_on_the_identity_channel()
-    # test_inverse_of_unitary_two_design()
-    # test_optimizing_coherent_information_dephrasure_using_choi_matrix()
-    # test_channel_method_using_dephrasure()
-    # test_entropy_exchange_dephrasure_channel()
-    # test_coherent_information_with_analytic_dephrasure()
-    # test_maxima_first_coherent_information_dephrasure()
-    # test_optimizing_coherent_information_with_erasure_channel()
-    # test_optimizing_coherent_information_with_amplitude_damping_channel()
-    # test_optimizing_coherent_information_pauli_channels()
-    # compare_lipschitz_slsqp_with_diffev()
-    # test_creation_of_one_qubit_operators()
-    # test_optimizing_coherent_information_erasure_using_choi_matrix()
-    # test_optimizing_coherent_information_erasure_using_choi_matrix()
-    # test_minimum_fidelity_over_depolarizing_channel()
-    # test_minimum_fidelity_over_amplitude_damping()
-    # test_minimum_fidelity_over_bit_flip()
