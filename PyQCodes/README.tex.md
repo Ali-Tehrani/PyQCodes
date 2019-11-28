@@ -10,7 +10,9 @@ This sections discusses two types of code and the functionalities.
     - Obtain the logical operators.
  
 - Optimization Codes
-
+    - Effective Channel Method.
+    - Approximate Average Fidelity/QVECTOR
+    - Channel Adaptive Codes (Work In Progress)
 
 
 Stabilizer Codes
@@ -121,20 +123,90 @@ All(Measure) | register
 Optimization Codes
 ==================
 
+PyQCodes can perform certain optimization-based codes based on either
+coherent information or fidelity.
 
 Effective Channel Method
 ------------------------
+The effective channel method optimizes either fidelity or coherent 
+information of the effective channel, the encoding, channel and recovery 
+operator.
 
-QVECTOR
--------
+For example, first define the kraus operators of the depolarizing channel 
+with probability of no error being 0.1.
+```python
+import numpy as np
+
+prob_no_error = 0.1
+prob_error = (1. - prob_no_error) / 3.
+
+k1 = np.array([[1., 0.], [0., 1.]]) * np.sqrt(prob_no_error)
+k2 = np.array([[0., 1.], [1., 0.]]) * np.sqrt(prob_error)
+k3 = np.array([[0., -complex(0., 1.)], [complex(0., 1.), 0.]]) * np.sqrt(prob_error)
+k4 = np.array([[1., 0.], [0., -1.]]) * np.sqrt(prob_error)
+
+kraus = [k1, k2, k3, k4]
+```
+
+The second step is to define the stabilizer code. Here, the
+(2, 1) cat-code will be used which has stabilizers "ZZ" and binary 
+representation $\begin{bmatrix}0 & 0 & 1 & 1 \end{bmatrix}$.
+
+```python
+from PyQCodes.codes import StabilizerCode
+
+stab_code = ["ZZ"]
+# Binary Representation of Cat Code.
+bin_rep = np.array([[0, 0, 1, 1]])
+code_param = (2, 1)
+```
+
+It will first create the effective channel, which will then be optimized 
+using the coherent information.
+
+```python
+from PyQCodes.find_codes import effective_channel_with_stabilizers
+result = effective_channel_with_stabilizers(bin_rep, code_param, kraus, optimize="coherent")
+
+print("Optimal Value: ", result["optimal_val"])
+```
 
 
-Average Fidelity
-----------------
+Approximate Average Fidelity / QVECTOR
+---------------------------------------
+Consider the bit-flip map applied on one qubit with probability of error 0.1.
 
-Algorithm Info
-==============
-Binary Representation
----------------------
+```python
+import numpy as np
+import projectq
+from projectq.ops import XGate
 
+# Construct the engine and qubits.
+eng = projectq.MainEngine()
+register = eng.allocate_qureg(1)
+eng.flush()  # Need to flush it in order to set_wavefunction
+
+def bit_flip(engine, register):
+    rando = np.random.random()  # Get uniform random number from zero to one..
+    if rando < 0.1:  # If it is less than probability of error.
+        XGate() | register  # Apply the error.
+    engine.flush()
+```
+
+The average fidelity can be approximated using approximate unitary 2-design.
+```python
+from PyQCodes.find_codes import QDeviceChannel
+
+# Construct the Quantum Device Channel
+chan_dev = QDeviceChannel(eng, register, bit_flip)
+# Apply the algorithm using 500 trials and epsilon approximation of 0.001.
+fidelity = chan_dev.estimate_average_fidelity_channel(500, 0.001)
+print("The Approximate Fidelity is: ", fidelity)
+```
+
+TODO: Insert example of how to do QVECTOR
+
+
+Channel Adaptive Codes (Work in Progress)
+-----------------------------------------
 

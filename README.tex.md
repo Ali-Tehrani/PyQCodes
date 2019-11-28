@@ -2,25 +2,25 @@ PyQCodes
 ========
 <a href='https://docs.python.org/3.6/'><img src='https://img.shields.io/badge/python-3.6-blue.svg'></a>
 
-PyQCodes provides a set of functions to investigate coherent information, minimum fidelity, certain optimization-based codes and stabilizer codes.
+PyQCodes provides a set of functions to investigate the coherent information, 
+minimum fidelity, certain optimization-based codes and stabilizer codes.
 
 Guide To Do
 -----------
 * Quantum Channels. See [file for more info](PyQCodes/chan/README.md).
-    - Compute Channel, Adjoint of Channel.
-    - Compute Complementary Channel and Adjoint of Complementary Channel.
+    - Compute Channel and Adjoint of Channel of a density matrix..
+    - Compute Complementary Channel and Adjoint of Complementary Channel of a
+     density matrix.
     - Optimize Coherent Information and Minimum Fidelity.
     - Serial/Parallel concatenate two channels .
 * Stabilizer Codes.  See [file for more info](PyQCodes/README.md).
     - Find Logical Operators.
     - Apply Encoding, Measurement, and Decoding Circuit.
 * Optimization-Based Codes.  See [file for more info](PyQCodes/README.md).
-    - Optimizes the average fidelity over Recover/Encoding operators. Based on [^1]
-    - Effective Channel Method of Stabilizer Codes. Based on [^2] and [^3].
+    - Effective Channel Method of Stabilizer Codes. Based on [2].
+    - Approximate the average fidelity of a circuit. Based on [3].
+    - Optimizes the average fidelity over Recover/Encoding operators. Based on [1]
 
-[^1] : Channel-Adapted Quantum Error Correction for the Amplitude Damping Channel.
-[^2] : 
-[^3] : 
 
 Examples
 --------
@@ -90,9 +90,20 @@ Generally, PyQCode has MIT license unless the directory/file says otherwise.
 
 Acknowledgements
 =================
-Funded by the Huawei Innovation Fund TODO.
+Funded by the Huawei Innovation Research Program. 
+Written by Ali Tehrani, Ningping Cao. supervised by Dr. Bei Zeng.
 
 
 Contact Info
 ============
 If any questions, feel free to open up an issue or email at "atehrani@uoguelph.ca"
+
+References
+==========
+
+[1]: "Channel-Adapted Quantum Error Correction for the Amplitude Damping Channel".
+
+[2]: "Quantum error-correcting codes need not completely reveal the error 
+syndrome."
+
+[3]: "QVECTOR: an algorithm for device-tailored quantum error correction"

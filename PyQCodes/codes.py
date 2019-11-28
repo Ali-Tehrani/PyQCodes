@@ -37,7 +37,7 @@ __all__ = ["QCode", "StabilizerCode"]
 
 # Constants: Pauli Operators Plus Sparse Pauli Operators used throughout this file.
 X, Y, Z, I = [np.array([[0., 1.], [1., 0.]]),
-              np.array([[0., complex(0, -1.)], [complex(0., 1.), 0.]]),
+              np.array([[0., complex(0., -1.)], [complex(0, 1.), 0.]]) * complex(0, -1.),
               np.array([[1., 0.], [0, -1.]]), np.eye(2)]
 
 XS, YS, ZS, IS = [csr_matrix(X, dtype=np.complex128),
@@ -180,7 +180,7 @@ class StabilizerCode():
         self._pauli_stab = [StabilizerCode.binary_rep_to_pauli_str(x) for x in stabilizer_group]
 
         # The attributes from constructing the standard normal form, its rank and logical operators.
-        self.normal_form, self.rank = self._standard_normal_form()
+        self.normal_form, self._rank = self._standard_normal_form()
         if logical_ops is None:
             self._logical_x, self._logical_z = self.logical_operators()
         else:
@@ -223,6 +223,11 @@ class StabilizerCode():
     def logical_z(self):
         r"""Obtain the logical Z operators."""
         return self._logical_z
+
+    @property
+    def rank(self):
+        r"""Rank from standard normal form."""
+        return self._rank
 
     def __iter__(self):
         r"""Iterate through the stabilizer generators in the normal form."""
@@ -406,7 +411,7 @@ class StabilizerCode():
                 elif pauli_element == 'Y':
                     # ZGate() | register[i]
                     # XGate() | register[i]
-                    QubitOperator('Y' + str(i), 1.) | register
+                    QubitOperator('Y' + str(i), -1.j) | register
                 elif pauli_element == 'Z':
                     ZGate() | register[i]
                 elif pauli_element == "I":
@@ -452,21 +457,19 @@ class StabilizerCode():
             assert binary in [0, 1], "state should be all binary elements."
             if binary == 1:
                 XGate() | register[self.n - self.k + i]
+        eng.flush()
 
         # Construct Controlled Unitary operators To Model Logical X Operators, this is only needed
         # when the rank is less than n- k.
         if self.rank < self.numb_stab:
-            # TODO: Check this.
-            print("the rank is", self.rank)
-            print("Numb of stabs is ", self.numb_stab)
-
-            for i in range(0, self.k):  # Go Thorough each un-coded.
-                # Get the Controlled unitary operator
+            for i in range(self.k - 1, -1, -1):  # Go Thorough each un-encoded.
+                # Get the ith Controlled unitary operator
                 controlled_op = logical_x[i, self.rank:self.n - self.k]
-                with Control(eng, register[self.n - self.k + i]):
+                with Control(eng, register[i - self.k]):
                     for j, binary in enumerate(controlled_op):
                         if binary == 1:
                             XGate() | register[self.rank + j]
+                eng.flush()
 
         # Construct The application of stabilizer generators.
         # Go Through the first rank qubits, should be all initialized to zero, or go through
@@ -474,26 +477,23 @@ class StabilizerCode():
         for i in range(0, self.rank):
             # Apply hadamard gate to every encoded qubit.
             HGate() | register[i]
-
+            eng.flush()
             # Get pauli operator of normal stabilizer generator.
             pauli = self.binary_rep_to_pauli_str(self.normal_form[i])
 
             # Apply controlled operators with the ith-qubit being controlled.
-            with Control(eng, register[i]):
-                for j, pauli_op in enumerate(pauli):
+            for j, pauli_op in enumerate(pauli):
+                with Control(eng, register[i]):
                     if j != i:  # The ith qubit is controlled.
                         if pauli_op == 'X':
                             XGate() | register[j]
                         elif pauli_op == 'Y':
-                            # ZGate() | register[j]
-                            # XGate() | register[j]
-                            # YGate() | register[j]
-                            QubitOperator('Y' + str(j), 1.j) | register
+                            QubitOperator('Y' + str(j), -1.j) | register
                         elif pauli_op == 'Z':
                             #  Z Gate Acts trivially on |0000 \delta>
                             # if j < i:
                             ZGate() | register[j]
-            eng.flush()
+                eng.flush()
         eng.flush()
 
     def apply_stabilizer_circuit(self, eng, register, stabilizer):
@@ -609,10 +609,7 @@ class StabilizerCode():
                     if pauli_op == "X":
                         XGate() | register[j_qubit]
                     elif pauli_op == "Y":
-                        # YGate() | register[j_qubit]
-                        ZGate() | register[j_qubit]
-                        XGate() | register[j_qubit]
-                        # QubitOperator('Y' + str(j_qubit), -1.j) | register
+                        QubitOperator('Y' + str(j_qubit), -1.j) | register
                     elif pauli_op == "Z":
                         ZGate() | register[j_qubit]
 
@@ -631,6 +628,8 @@ class StabilizerCode():
     def logical_circuit(self, eng, register, pauli_op):
         r"""
         Apply the circuit for the logical operator.
+
+        The Y-logical operator does not have phase information, in order words it is exactly Y = XZ.
 
         Parameters
         ----------
@@ -677,9 +676,10 @@ class StabilizerCode():
             if pauli_op == "X":
                 XGate() | register[i]
             elif pauli_op == "Y":
-                QubitOperator('Y' + str(i), 1.j) | register
+                QubitOperator('Y' + str(i), -1.j) | register
             elif pauli_op == "Z":
                 ZGate() | register[i]
+        eng.flush()
 
     def undetectable_errors(self):
         r"""
@@ -757,7 +757,7 @@ class StabilizerCode():
             for i in range(0, numb_stabs):
                 if i != j and output[i, j] != 0:
                     output[i, :] = (output[j, :] + output[i, :]) % 2
-
+        print("First block rank ", rank)
         return output, rank
 
     def _gaussian_elimination_second_block(self, binary_rep, rank):

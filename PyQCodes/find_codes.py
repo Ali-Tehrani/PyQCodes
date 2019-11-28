@@ -34,7 +34,7 @@ One can optimize the average fidelity or coherent information of the channel
 with respect to either the decoder, encoder, or have them both fixed.
 """
 
-__all__ = ["effective_coherent_info", ""]
+__all__ = ["effective_coherent_info", "QDeviceChannel"]
 
 
 def effective_coherent_info(kraus_encod, kraus_chan, kraus_decods, objective="coherent",
@@ -147,7 +147,6 @@ def effective_channel_with_stabilizers(stabilizer, code_param, pauli_errors, opt
         raise TypeError("Number of Columns of Pauli error does not match 2**k.")
 
     # Parameters for optimization
-    # TODO: Add error if n is not a multiple of k.
     # TODO: add coherent information parameters.
 
     # Set up the objects, stabilizer code, pauli-channel error, respectively.
@@ -224,7 +223,7 @@ class QDeviceChannel():
     def numb_qubits(self):
         return self._device._numb_qubits
 
-    def estimate_average_fidelity_channel(self, ntimes, epsilon):
+    def estimate_average_fidelity_channel(self, ntimes, epsilon, cheat=False):
         r"""
         Estimate the average fidelity of the quantum channel.
 
@@ -234,13 +233,16 @@ class QDeviceChannel():
             The number of trials to sample.
         epsilon : float
             The approximation to the unitary two design.
+        cheat : bool
+            TODO
 
         Returns
         -------
         float :
             The estimated average fidelity of the quantum circuit.
+
         """
-        return self._device.estimate_average_fidelity(self.channel, ntimes, epsilon)
+        return self._device.estimate_average_fidelity(self.channel, ntimes, epsilon, cheat)
 
     def estimate_average_fidelity_error_code(self, encoder, decoder, ntimes, epsilon):
         r"""

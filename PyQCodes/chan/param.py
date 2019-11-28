@@ -105,6 +105,7 @@ class StandardBasis(ParameterizationABC):
     dim = 3
     vec = StandardBasis.vec_from_rho(rho, dim)
     # vec = [0.25, 0.2, 0.1, 0.3, 0, 0.25, 0.23, 0.1, 0.5]
+
     """
     @staticmethod
     def numb_variables(d):
@@ -304,6 +305,7 @@ class OverParam(ParameterizationABC):
         -------
         array :
             Returns a hermitian, trace-one matrix of rank "rank".
+
         """
         # Note that matrix entries are bounded above by one, because the eigenvalues are bounded
         # above by one.
@@ -400,6 +402,7 @@ class CholeskyParam(ParameterizationABC):
     A = np.array([[np.sqrt(0.5), 0], [0, np.sqrt(0.5)]])
     vec = CholeskyParam.vec_from_rho(rho, nsize=2, rank=2)
     # Note that it is non-unique parameterization.
+
     """
     @staticmethod
     def random_vectors(nsize, rank, dist="uniform", l_bnd=-1, u_bnd=1.):
@@ -519,6 +522,7 @@ class CholeskyParam(ParameterizationABC):
         ----------
         .. [1] Pinheiro, J. C., & Bates, D. M. (1996).  Unconstrained parametrizations for
                variance-covariance matrices. Statistics and computing, 6(3), 289-296.
+
         """
         if rank is None:
             rank = nsize

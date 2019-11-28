@@ -44,14 +44,13 @@ class DeviceAdaptorABC(ABC):
         pass
 
     @abstractmethod
-    def unitary_two_design(self):
+    def approximate_unitary_two_design(self):
         pass
 
     @abstractmethod
     def estimate_average_fidelity(self):
         pass
 
-    @abstractmethod
     def decomp_one_qubit_c_unitaries(self):
         # Project Q already implements this, so it is probably not useful at all.
         pass
@@ -126,14 +125,14 @@ class ProjectQDeviceAdaptor(DeviceAdaptorABC):
         """
         if not self._real_device:
             if cheat:
-                probability = [1.] + [0.] * (self.numb_qubits - 1)
+                probability = [1.] + [0.] * (2**self.numb_qubits - 1)
                 self.eng.backend.set_wavefunction(probability, self.register)
             else:
                 self.eng.flush(deallocate_qubits=True)
                 self._register = self.eng.allocate_qureg(self.numb_qubits)
                 self.eng.flush()
 
-    def unitary_two_design(self, epsilon):
+    def approximate_unitary_two_design(self, epsilon):
         r"""
         Construct the circuit for the epsilon-approximate unitary two design.
 
@@ -200,9 +199,6 @@ class ProjectQDeviceAdaptor(DeviceAdaptorABC):
         ----------
         random_phases : list of lists
 
-        Returns
-        -------
-
         """
         for ith_phases in random_phases:
             All(H) | self.register
@@ -223,7 +219,7 @@ class ProjectQDeviceAdaptor(DeviceAdaptorABC):
 
             self.eng.flush()
 
-    def estimate_average_fidelity(self, channel, ntimes, epsilon):
+    def estimate_average_fidelity(self, channel, ntimes, epsilon, cheat=False):
         r"""
         Estimate the average fidelity by epsilon-approximate unitary two design.
 
@@ -236,6 +232,8 @@ class ProjectQDeviceAdaptor(DeviceAdaptorABC):
             The number of trials to sample.
         epsilon : float
             The approximation to the unitary two design.
+        cheat : bool
+            TODO
 
         Returns
         -------
@@ -249,10 +247,10 @@ class ProjectQDeviceAdaptor(DeviceAdaptorABC):
         ntimes_zero = 0.
         for _ in range(0, ntimes):
             # Set register to zero.
-            self.set_register_to_zero(cheat=True)
+            self.set_register_to_zero(cheat=cheat)
 
             # Apply the approximate unitary two design.
-            random_phase = self.unitary_two_design(epsilon)
+            random_phase = self.approximate_unitary_two_design(epsilon)
 
             # Apply the quantum channel
             channel(self.eng, self.register)

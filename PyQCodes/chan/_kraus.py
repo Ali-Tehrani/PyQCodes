@@ -918,11 +918,11 @@ class DenseKraus(Kraus):
 
         Examples
         --------
-        # Define I, X, Y, Z to be pauli channels
-        k1 = [I, X]  # As a list
-        k2 = np.array([I, Z])  # As numpy array
-        k3 = DenseKraus.parallel_concatenate(k1, k2)  # Parallel Concatenate two kraus op sets.
-        # k3 should be numpy array of [I tensor I, I tensor Z, X tensor I, X tensor Z]
+        Define I, X, Y, Z to be pauli channels
+        >> k1 = [I, X]  # As a list
+        >> k2 = np.array([I, Z])  # As numpy array
+        >> k3 = DenseKraus.parallel_concatenate(k1, k2)  # Parallel Concatenate two kraus op sets.
+        k3 should be numpy array of [I tensor I, I tensor Z, X tensor I, X tensor Z]
 
         """
         # Convert list type to numpy array.
