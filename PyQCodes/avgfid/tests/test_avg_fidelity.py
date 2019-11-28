@@ -1,3 +1,11 @@
+r"""
+######################
+### IMPORTANT ########
+######################
+
+This file has the GNU license due to using the python package PICOS.
+Please be careful.
+"""
 import numpy as np
 import pytest
 import picos as pic
