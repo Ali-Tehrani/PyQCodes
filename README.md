@@ -62,7 +62,7 @@ print("Optimal Value", result["optimal_val"])
 
 Installing
 ----------
-Before, installing make sure that Python 3.6 or higher and Cython (>= 0.21) is installed.
+Before, installing make sure that Python 3.6 or higher and Cython (>= 0.21) is installed. It is recommended that ProjectQ is already installed before running installation here.
 
 First clone to a directory by running:
 ```bash
