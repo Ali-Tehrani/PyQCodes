@@ -85,9 +85,13 @@ License
 Generally, PyQCode has MIT license unless the directory/file says otherwise.
 
 
+Ownership
+=========
+PyQCodes is jointly owned equally by the University of Guelph (and its employees) and Huawei, funded through the Huawei Innovation Research.
+
+
 Acknowledgements
 =================
-Funded by the Huawei Innovation Research Program. 
 Written by Ali Tehrani, Ningping Cao. supervised by Dr. Bei Zeng.
 
 
