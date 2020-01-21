@@ -15,11 +15,11 @@ Guide To Do
     - Serial/Parallel concatenate two channels .
 * Stabilizer Codes.  See [file for more info](PyQCodes/README.md).
     - Find Logical Operators.
-    - Apply Encoding, Measurement, and Decoding Circuit.
+    - Apply Encoding, Measurement, and Decoding Circuit. (In Progress)
 * Optimization-Based Codes.  See [file for more info](PyQCodes/README.md).
-    - Effective Channel Method of Stabilizer Codes. Based on [2].
+    - Effective Channel Method of Stabilizer Codes. Based on [2]. 
     - Approximate the average fidelity of a circuit. Based on [3].
-    - Optimizes the average fidelity over Recover/Encoding operators. Based on [1]
+    - Optimizes the average fidelity over Recover/Encoding operators. Based on [1]. (In Progress).
 
 
 Examples
