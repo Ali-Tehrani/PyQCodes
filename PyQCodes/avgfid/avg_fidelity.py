@@ -5,6 +5,11 @@ r"""
 
 This file has the GNU license due to using the python package PICOS.
 Please be careful.
+
+PyQCodes - Software for investigating coherent information and
+optimization-based quantum error-correcting codes.
+PyQCodes is jointly owned equally by the University of Guelph (and its employees)
+and Huawei, funded through the Huawei Innovation Research.
 """
 import numpy as np
 from PyQCodes.chan._choi import ChoiQutip

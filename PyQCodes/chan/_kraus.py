@@ -1,7 +1,10 @@
 r"""
-The MIT License.
+The MIT License
 
-Copyright (c) 2019-Present PyQCodes
+Copyright (c) 2019-Present PyQCodes - Software for investigating
+coherent information and optimization-based quantum error-correcting codes.
+PyQCodes is jointly owned equally by the University of Guelph (and its employees)
+and Huawei, funded through the Huawei Innovation Research.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
